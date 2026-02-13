@@ -36,10 +36,14 @@ This tool showcases how to safely integrate AI-powered code refactoring into dev
 
 ### 🎨 Developer Experience
 
+- **Interactive setup**: No manual configuration file editing required
 - **Colored diff output**: Clear visualization of changes
 - **Backup files**: Optional automatic backups before applying changes
 - **Cost estimation**: Preview token usage before API calls
 - **Interactive confirmation**: Review changes before applying
+- **Secure input**: API key entry is hidden for security
+- **Global installation**: Install once, use everywhere with pipx
+- **Multi-language support**: Works with any text-based source files
 
 ## Installation
 
@@ -48,30 +52,88 @@ This tool showcases how to safely integrate AI-powered code refactoring into dev
 - Python 3.8 or higher
 - Anthropic API key ([get one here](https://console.anthropic.com/))
 
-### Setup
+### Quick Install (Recommended)
 
-1. **Clone or download this repository**:
-   ```bash
-   cd ai-governance-tool
-   ```
+Install globally using `pipx` for system-wide access:
 
-2. **Install the package**:
-   ```bash
-   pip install -e .
-   ```
+```bash
+# Install pipx if you don't have it
+pip install pipx
+pipx ensurepath
 
-3. **Configure API key**:
-   ```bash
-   # Create .env file
-   echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
-   ```
+# Install ai-governance globally
+pipx install /path/to/ai-governance-tool
+```
 
-   Or run the init command:
-   ```bash
-   ai-governance init
-   ```
+Now `ai-governance` is available from any directory, any project!
+
+### Alternative: Local Development Install
+
+For development or project-specific installation:
+
+```bash
+cd ai-governance-tool
+pip install -e .
+```
+
+### First-Time Setup
+
+The tool will guide you through setup interactively. You have two options:
+
+**Option 1: Run init command** (Recommended)
+```bash
+ai-governance init
+```
+
+This will:
+- Prompt for your Anthropic API key (input is hidden for security)
+- Ask where to save it (global config, local, or session-only)
+- Set up everything automatically
+
+**Option 2: Just start using it**
+
+Simply run your first refactor command:
+```bash
+ai-governance refactor myfile.py --target "modernize code"
+```
+
+The tool will detect the missing API key and walk you through setup interactively!
+
+### Configuration Options
+
+When prompted, you can choose where to store your API key:
+
+1. **Global** (recommended) - `~/.config/ai-governance/.env`
+   - Available from any project directory
+   - Best for personal use
+
+2. **Local** - `./.env` in current directory
+   - Project-specific configuration
+   - Good for team projects with different keys
+
+3. **Session-only** - Environment variable
+   - Not saved to disk
+   - Perfect for one-time use or testing
 
 ## Usage
+
+### Global Access
+
+Once installed with `pipx`, you can use `ai-governance` from **any directory**, with **any project**, in **any language**:
+
+```bash
+# Navigate to any project
+cd ~/my-react-app
+ai-governance refactor src/App.js --target "modernize JavaScript"
+
+cd ~/my-python-project
+ai-governance refactor legacy.py --target "add type hints"
+
+cd ~/my-go-project
+ai-governance refactor main.go --target "improve error handling"
+```
+
+The tool works with any text-based source files!
 
 ### Basic Commands
 
@@ -85,6 +147,14 @@ Example:
 ai-governance refactor demo/legacy_code/utils.py --target "modernize to Python 3.10+ with type hints"
 ```
 
+**First-time users**: If you haven't configured an API key, the tool will:
+1. Detect the missing key
+2. Prompt you to enter it (securely, input is hidden)
+3. Ask where to save it
+4. Continue with your refactoring
+
+No need to stop and manually edit configuration files!
+
 #### View audit logs
 ```bash
 ai-governance audit
@@ -92,10 +162,15 @@ ai-governance audit --status blocked
 ai-governance audit --stats
 ```
 
-#### Initialize configuration
+#### Initialize or reconfigure
 ```bash
 ai-governance init
 ```
+
+This command lets you:
+- Set up your API key for the first time
+- Change your existing configuration
+- Switch between global and local config
 
 ### Command Options
 
@@ -323,8 +398,27 @@ MIT License - See LICENSE file for details
 
 For issues or questions:
 - Check the audit logs: `ai-governance audit`
-- Review the policy configuration: `profiles/default-secure.yaml`
-- Verify API key is set: `echo $ANTHROPIC_API_KEY`
+- Reconfigure API key: `ai-governance init`
+- Check global config: `cat ~/.config/ai-governance/.env`
+- Check local config: `cat .env` (in your project directory)
+- Review the default policy (bundled with package)
+
+### Troubleshooting
+
+**"API key not found" error:**
+- Run `ai-governance init` to set up your key
+- Or simply try a refactor command - it will prompt you interactively
+
+**Tool not found after installation:**
+- With pipx: Make sure `~/.local/bin` is in your PATH
+- Run `pipx ensurepath` and restart your terminal
+
+**Want to change API key:**
+- Run `ai-governance init` and choose to reconfigure
+
+**Want to use different keys for different projects:**
+- Use local configuration (option 2 during setup)
+- Or set `ANTHROPIC_API_KEY` environment variable per-project
 
 ## Acknowledgments
 

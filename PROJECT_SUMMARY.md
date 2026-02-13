@@ -45,19 +45,46 @@ ai-governance-tool/
 
 ✅ **refactor** command:
 - Scans files for security violations
+- **Interactively prompts for API key if not configured**
 - Sends clean code to Claude API
 - Shows colored diffs
 - Creates backups
 - Logs all actions
 
 ✅ **init** command:
-- Generates .env template
-- Shows setup instructions
+- **Interactive API key setup with hidden input**
+- **Choice of global, local, or session-only configuration**
+- Automatic configuration file creation
+- Guided setup process
 
 ✅ **audit** command:
 - Views audit logs
 - Filters by status
 - Shows statistics
+
+### NEW: Interactive Configuration System
+
+✅ **Smart API Key Detection**:
+- Automatically detects missing API keys
+- Prompts user interactively when needed
+- No manual file editing required
+- Secure input (hidden password field)
+
+✅ **Flexible Storage Options**:
+1. **Global configuration** (`~/.config/ai-governance/.env`)
+   - Available from any project directory
+   - Best for personal use
+2. **Local configuration** (`./.env` in project)
+   - Project-specific API keys
+   - Good for team environments
+3. **Session-only** (environment variable)
+   - Not saved to disk
+   - Perfect for one-time use
+
+✅ **Package Resource Management**:
+- Policy files bundled with package
+- No external dependencies on file locations
+- Works from any installation method
 
 ### 2. Policy Engine
 
@@ -202,7 +229,50 @@ colorama>=0.4.6      # Colored output
 python-dotenv>=1.0.0 # Environment variables
 ```
 
+## Installation Methods
+
+### Recommended: Global Installation with pipx
+```bash
+pipx install /path/to/ai-governance-tool
+```
+
+**Benefits:**
+- Available from any directory, any project
+- Isolated Python environment
+- Works with any programming language files
+- Easy to update and manage
+
+### Alternative: Local Development Install
+```bash
+cd ai-governance-tool
+pip install -e .
+```
+
 ## Usage Examples
+
+### First-Time Setup (Interactive):
+```bash
+# Option 1: Run init
+ai-governance init
+# Prompts for API key, asks where to save
+
+# Option 2: Just start using it
+ai-governance refactor myfile.py --target "modernize"
+# Auto-detects missing API key and prompts
+```
+
+### Global Usage Across Projects:
+```bash
+# Works from ANY directory
+cd ~/react-project
+ai-governance refactor src/App.js --target "add TypeScript"
+
+cd ~/python-project
+ai-governance refactor main.py --target "modernize"
+
+cd ~/go-project
+ai-governance refactor main.go --target "improve error handling"
+```
 
 ### Run Demo:
 ```bash
@@ -230,6 +300,7 @@ ai-governance audit --stats
 
 ## Success Criteria - ALL MET ✅
 
+### Core Functionality
 ✅ CLI with Click framework (refactor, init, audit commands)
 ✅ Policy engine loading from YAML
 ✅ File pattern blocking (**/payment*, etc.)
@@ -243,17 +314,33 @@ ai-governance audit --stats
 ✅ Correct blocking with specific reasons
 ✅ Token usage and cost tracking
 ✅ Queryable audit trail
-✅ README with setup instructions
 ✅ Demo script showing functionality
 ✅ requirements.txt with dependencies
 
+### NEW: Enhanced User Experience
+✅ Interactive API key setup (no manual file editing)
+✅ Secure API key input (hidden password field)
+✅ Multiple configuration options (global/local/session)
+✅ Auto-detection of missing API key
+✅ Inline setup during first refactor command
+✅ Global installation support with pipx
+✅ Package bundled policy files (importlib.resources)
+✅ Multi-language support (works with any text files)
+✅ Updated comprehensive documentation
+
 ## Next Steps for Users
 
-1. Set up API key: `echo "ANTHROPIC_API_KEY=your_key" > .env`
-2. Run demo: `python demo.py`
-3. Try refactoring: `ai-governance refactor demo/legacy_code/utils.py --target "modernize"`
-4. Review audit logs: `ai-governance audit`
-5. Customize policy: Edit `profiles/default-secure.yaml`
+### Quick Start (2 minutes):
+1. **Install globally**: `pipx install /path/to/ai-governance-tool`
+2. **Interactive setup**: `ai-governance init` (or skip - it will prompt on first use)
+3. **Try it**: `ai-governance refactor demo/legacy_code/utils.py --target "modernize"`
+4. **Review logs**: `ai-governance audit`
+
+### Advanced:
+- **Use with any project**: `cd ~/my-project && ai-governance refactor file.ext --target "improve"`
+- **Run demo**: `python demo.py`
+- **Custom policy**: `ai-governance refactor file.py --policy custom.yaml --target "refactor"`
+- **Reconfigure anytime**: `ai-governance init`
 
 ## License
 
@@ -262,14 +349,29 @@ MIT License - See LICENSE file
 ## Technical Highlights
 
 - **Modular architecture**: Separation of concerns across components
+- **Interactive UX**: No manual configuration file editing required
+- **Secure credential handling**: Hidden password input for API keys
+- **Flexible deployment**: Global (pipx) or local installation
+- **Resource bundling**: Policy files packaged with distribution
+- **Multi-environment support**: Global, local, or session-only configuration
 - **Comprehensive error handling**: Graceful failures with helpful messages
 - **Rich user feedback**: Colored output, progress indicators, statistics
 - **Audit trail**: Complete logging for compliance and debugging
 - **Extensible design**: Easy to add new patterns, commands, or features
 - **Production-ready patterns**: Type hints, docstrings, clean code structure
+- **Language-agnostic**: Works with any text-based source files
 
 ---
 
 **Project Status**: ✅ COMPLETE AND FULLY FUNCTIONAL
 
 All requirements met, tested, and documented.
+
+**Recent Enhancements** (Latest Update):
+- ✅ Interactive API key management (no manual .env editing)
+- ✅ Global installation support with pipx
+- ✅ Auto-detection and inline setup
+- ✅ Secure password input for credentials
+- ✅ Multi-configuration support (global/local/session)
+- ✅ Bundled policy files using importlib.resources
+- ✅ Comprehensive documentation updates

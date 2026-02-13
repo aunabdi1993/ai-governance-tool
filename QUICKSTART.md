@@ -1,71 +1,92 @@
 # Quick Start Guide
 
-Get up and running with AI Governance Tool in 5 minutes.
+Get up and running with AI Governance Tool in under 2 minutes.
 
-## Installation
+## Step 1: Install (30 seconds)
+
+### Recommended: Global Installation with pipx
 
 ```bash
-# Install the package
-pip install -e .
+# Install pipx (if you don't have it)
+pip install pipx
+pipx ensurepath
+
+# Install ai-governance globally
+pipx install /path/to/ai-governance-tool
 
 # Verify installation
 ai-governance --version
 ```
 
-## Configuration
+Now the tool is available from **any directory**!
+
+### Alternative: Local Installation
 
 ```bash
-# Create .env file with your API key
-echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
+cd ai-governance-tool
+pip install -e .
+```
 
-# Or run init command
+## Step 2: First-Time Setup (1 minute)
+
+You have two options - both are completely interactive:
+
+### Option A: Run init (Guided Setup)
+
+```bash
 ai-governance init
 ```
 
-## Run the Demo
+**What happens:**
+1. Asks: "Do you have your API key ready?"
+2. Prompts for your API key (input is hidden)
+3. Asks where to save it (global/local/session-only)
+4. Done! You're ready to go.
+
+### Option B: Jump Right In
+
+Skip the init and just start using it:
 
 ```bash
-# Run the security scanning demo
-python demo.py
-
-# Or use the shell script
-bash demo.sh
+cd ~/any-project
+ai-governance refactor myfile.py --target "modernize code"
 ```
 
-This will scan all demo files and show which ones are blocked and why.
+The tool will detect you don't have an API key and walk you through setup automatically!
 
-## Try It Out
+## Step 3: Try It Out (30 seconds)
 
-### 1. Scan a file (dry run)
+### Test with Demo Files
 
 ```bash
+# Scan a file (no API call, free)
 ai-governance refactor demo/legacy_code/utils.py \
-  --target "modernize to Python 3.10+" \
+  --target "modernize" \
   --dry-run
-```
 
-### 2. Refactor a clean file
-
-```bash
+# Actually refactor it (uses AI)
 ai-governance refactor demo/legacy_code/utils.py \
-  --target "add type hints and use modern Python idioms"
-```
+  --target "add type hints and modern Python idioms"
 
-### 3. Try to refactor a file with secrets (will be blocked)
-
-```bash
+# Try a file with secrets (will be blocked)
 ai-governance refactor demo/legacy_code/user_service.py \
-  --target "refactor to FastAPI async"
+  --target "refactor to FastAPI"
 ```
 
-This will be blocked because it contains:
-- Hardcoded API key
-- Database password
-
-### 4. View audit logs
+### Use with Your Own Projects
 
 ```bash
-# View all logs
+# Navigate to any project (Python, JS, Go, Java, etc.)
+cd ~/my-react-app
+
+# Refactor any file
+ai-governance refactor src/App.js --target "add comments and improve readability"
+```
+
+## Step 4: View Results
+
+```bash
+# View all audit logs
 ai-governance audit
 
 # View only blocked attempts
@@ -75,97 +96,136 @@ ai-governance audit --status blocked
 ai-governance audit --stats
 ```
 
-## What's Happening?
+## Common Usage Patterns
 
-1. **Security Scanning**: Before sending code to AI, the tool:
-   - Checks if file path matches blocked patterns (`**/payment*`, `**/.env*`, etc.)
-   - Scans content for sensitive patterns (API keys, passwords, emails, credit cards)
+### Quick Refactoring
+```bash
+ai-governance refactor file.py --target "modernize" --apply
+```
 
-2. **Blocking**: If sensitive content is found:
-   - Request is blocked
-   - Reason is logged to audit database
-   - No API call is made
+### Safe Testing (Dry Run)
+```bash
+ai-governance refactor file.py --target "test" --dry-run
+```
 
-3. **Refactoring**: If file passes security checks:
-   - Code is sent to Claude API
-   - Refactored code is returned
-   - Diff is displayed
-   - User confirms before applying
+### No Backup Needed
+```bash
+ai-governance refactor file.py --target "add comments" --no-backup
+```
 
-4. **Audit Logging**: All actions are logged with:
-   - Timestamp and filepath
-   - Action and status
-   - Token usage and cost
-   - Security findings (if any)
+### Custom Policy
+```bash
+ai-governance refactor file.py --target "refactor" --policy custom.yaml
+```
 
-## Expected Results
+## Configuration Details
 
-### Files that should be BLOCKED:
+### Where is my API key stored?
 
-- `user_service.py` - API key, password
-- `email_handler.py` - SMTP password, emails
-- `payment_processor.py` - Credit card data, matches payment* pattern
+Depends on what you chose during setup:
 
-### Files that should be ALLOWED:
+- **Global** (recommended): `~/.config/ai-governance/.env`
+- **Local**: `./.env` in your project directory
+- **Session-only**: Environment variable (not saved)
 
-- `utils.py` - Clean utility functions
-- `helper_functions.py` - Clean helper functions
-
-## Next Steps
-
-1. Customize the security policy in `profiles/default-secure.yaml`
-2. Add your own legacy code to refactor
-3. Review audit logs regularly
-4. Monitor costs via `ai-governance audit --stats`
-
-## Common Commands
+### How do I change my API key?
 
 ```bash
-# Initialize configuration
 ai-governance init
-
-# Refactor with automatic apply
-ai-governance refactor file.py --target "description" --apply
-
-# Refactor without backup
-ai-governance refactor file.py --target "description" --no-backup
-
-# Use custom policy
-ai-governance refactor file.py --target "description" --policy custom.yaml
-
-# View recent logs
-ai-governance audit --limit 20
-
-# View statistics
-ai-governance audit --stats
 ```
+
+Choose "yes" when asked if you want to reconfigure.
+
+### How do I use different keys for different projects?
+
+During setup, choose option 2 (Local) to save the API key in your project directory.
+
+## What Gets Scanned?
+
+The tool automatically blocks files with:
+
+✅ **File Patterns:**
+- `**/payment*`
+- `**/.env*`
+- `**/secrets/**`
+- `**/credentials*`
+
+✅ **Sensitive Content:**
+- API keys and tokens
+- Passwords
+- Credit card numbers
+- Private keys
+- AWS/Stripe keys
+- Email addresses
+
+## Expected Behavior
+
+### Demo Files
+
+**These WILL BE BLOCKED** (contain sensitive data):
+- `demo/legacy_code/user_service.py` - API key + password
+- `demo/legacy_code/email_handler.py` - SMTP password
+- `demo/legacy_code/payment_processor.py` - Credit card
+
+**These WILL BE ALLOWED** (clean code):
+- `demo/legacy_code/utils.py` - Clean utilities
+- `demo/legacy_code/helper_functions.py` - Clean helpers
 
 ## Troubleshooting
 
-### "API key required" error
-```bash
-# Set in .env file
-echo "ANTHROPIC_API_KEY=your_key" > .env
+### "API key not found"
+Just run the command again - it will prompt you!
 
-# Or export in shell
-export ANTHROPIC_API_KEY=your_key
+Or explicitly run: `ai-governance init`
+
+### "Command not found: ai-governance"
+
+**With pipx:**
+```bash
+pipx ensurepath
+# Then restart your terminal
 ```
 
-### "Policy file not found" error
-```bash
-# Verify profiles directory exists
-ls profiles/default-secure.yaml
+**With pip:**
+Make sure you're in the right Python environment.
 
-# Or specify custom policy
-ai-governance refactor file.py --policy /path/to/policy.yaml --target "desc"
+### Want to reconfigure?
+```bash
+ai-governance init
 ```
 
-### "File not found" error
+## Next Steps
+
+✅ **Explore the demo**
 ```bash
-# Use absolute or relative path
-ai-governance refactor ./demo/legacy_code/utils.py --target "desc"
+python demo.py
 ```
 
-## More Information
+✅ **Try with your own code**
+```bash
+cd ~/my-project
+ai-governance refactor src/main.py --target "improve code quality"
+```
 
-See [README.md](README.md) for complete documentation.
+✅ **Customize security policies**
+The default policy is bundled with the package. Use `--policy` flag for custom policies.
+
+✅ **Monitor costs and usage**
+```bash
+ai-governance audit --stats
+```
+
+## Full Documentation
+
+See [README.md](README.md) for complete documentation including:
+- Architecture details
+- Security policy configuration
+- Custom policy creation
+- Advanced usage
+- Best practices
+
+---
+
+**Total setup time: Under 2 minutes!**
+
+The tool handles all configuration interactively - no manual file editing required.
