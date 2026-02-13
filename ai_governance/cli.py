@@ -11,6 +11,8 @@ from .scanner import Scanner
 from .ai_client import AIClient
 from .diff_manager import DiffManager
 from .audit_logger import AuditLogger
+from .file_discoverer import FileDiscoverer
+from .batch_processor import BatchProcessor
 
 # Initialize colorama
 init(autoreset=True)
@@ -316,6 +318,163 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
         click.echo(f"{Fore.YELLOW}Set ANTHROPIC_API_KEY environment variable{Style.RESET_ALL}")
     except Exception as e:
         click.echo(f"\n{Fore.RED}Error: {e}{Style.RESET_ALL}")
+
+
+@cli.command()
+@click.argument('paths', nargs=-1, required=True, type=click.Path())
+@click.option(
+    '--target',
+    '-t',
+    required=True,
+    help='Description of desired refactoring (e.g., "refactor to async/await patterns")'
+)
+@click.option(
+    '--policy',
+    '-p',
+    type=click.Path(exists=True),
+    help='Path to policy YAML file (default: profiles/default-secure.yaml)'
+)
+@click.option(
+    '--no-backup',
+    is_flag=True,
+    help='Do not create backup files'
+)
+@click.option(
+    '--dry-run',
+    is_flag=True,
+    help='Scan only, do not refactor'
+)
+@click.option(
+    '--apply',
+    is_flag=True,
+    help='Automatically apply refactored code without confirmation'
+)
+@click.option(
+    '--recursive/--no-recursive',
+    default=True,
+    help='Recursively search directories (default: enabled)'
+)
+@click.option(
+    '--pattern',
+    help='File pattern to match (e.g., "test_*.py", "*.py")'
+)
+def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, pattern):
+    """Refactor multiple files or entire directories using AI.
+
+    PATHS can be:
+    - Multiple files: ai-governance bulk-refactor file1.py file2.py --target "..."
+    - Directories: ai-governance bulk-refactor src/ tests/ --target "..."
+    - Mix of both: ai-governance bulk-refactor file.py src/ --target "..."
+
+    Examples:
+        # Refactor all Python files in a directory
+        ai-governance bulk-refactor src/ --target "modernize to Python 3.10+"
+
+        # Refactor specific files
+        ai-governance bulk-refactor utils.py helpers.py --target "add type hints"
+
+        # Refactor all test files matching a pattern
+        ai-governance bulk-refactor tests/ --pattern "test_*.py" --target "use pytest fixtures"
+
+        # Dry run to see what would be refactored
+        ai-governance bulk-refactor src/ --target "..." --dry-run
+
+        # Auto-apply changes without confirmation
+        ai-governance bulk-refactor src/ --target "..." --apply
+    """
+    click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}AI Governance Tool - Bulk Refactor{Style.RESET_ALL}")
+    click.echo(f"{'=' * 70}\n")
+
+    # Initialize components
+    try:
+        policy_engine = PolicyEngine(policy)
+        scanner = Scanner(policy_engine)
+        audit_logger = AuditLogger()
+        diff_manager = DiffManager(create_backups=not no_backup)
+    except Exception as e:
+        click.echo(f"{Fore.RED}Error initializing components: {e}{Style.RESET_ALL}")
+        return
+
+    # Show policy info
+    policy_info = policy_engine.get_policy_info()
+    click.echo(f"{Fore.YELLOW}Policy: {policy_info['name']} (v{policy_info['version']}){Style.RESET_ALL}")
+    click.echo(f"Description: {policy_info['description']}\n")
+
+    # Discover files
+    click.echo(f"{Fore.CYAN}Discovering files...{Style.RESET_ALL}")
+    discoverer = FileDiscoverer(supported_extensions={'.py'})
+    files = discoverer.discover_files(
+        paths=list(paths),
+        recursive=recursive,
+        pattern=pattern
+    )
+
+    if not files:
+        click.echo(f"{Fore.YELLOW}No files found matching criteria{Style.RESET_ALL}")
+        return
+
+    click.echo(f"Found {len(files)} file(s) to process:\n")
+    for file_path in files:
+        click.echo(f"  • {file_path}")
+
+    # Confirm before proceeding (unless --apply or --dry-run)
+    if not dry_run and not apply:
+        click.echo(f"\n{Fore.YELLOW}This will refactor {len(files)} file(s) using AI.{Style.RESET_ALL}")
+        if not click.confirm("Do you want to continue?", default=True):
+            click.echo(f"{Fore.YELLOW}Operation cancelled{Style.RESET_ALL}")
+            return
+
+    # Ensure API key is configured before making AI calls
+    if not dry_run and not ensure_api_key():
+        click.echo(f"\n{Fore.RED}Cannot proceed without API key{Style.RESET_ALL}")
+        return
+
+    # Initialize AI client if not dry run
+    ai_client = None
+    if not dry_run:
+        try:
+            ai_client = AIClient()
+            click.echo(f"\n{Fore.CYAN}Model: {ai_client.model}{Style.RESET_ALL}")
+        except Exception as e:
+            click.echo(f"{Fore.RED}Error initializing AI client: {e}{Style.RESET_ALL}")
+            return
+
+    # Process files
+    click.echo(f"\n{Fore.CYAN}Processing files...{Style.RESET_ALL}")
+    batch_processor = BatchProcessor(
+        policy_engine=policy_engine,
+        scanner=scanner,
+        ai_client=ai_client,
+        diff_manager=diff_manager,
+        audit_logger=audit_logger,
+        no_backup=no_backup,
+        dry_run=dry_run,
+        apply=apply
+    )
+
+    batch_result = batch_processor.process_files(
+        files=files,
+        target=target,
+        show_progress=True
+    )
+
+    # Display summary
+    click.echo(batch_result.get_summary())
+
+    # Show detailed results for failed/blocked files
+    if batch_result.blocked > 0:
+        click.echo(f"{Fore.YELLOW}Blocked files:{Style.RESET_ALL}")
+        for filepath, result in batch_result.file_results.items():
+            if result['status'] == 'blocked':
+                click.echo(f"  • {filepath}: {result['reason']}")
+        click.echo()
+
+    if batch_result.failed > 0:
+        click.echo(f"{Fore.RED}Failed files:{Style.RESET_ALL}")
+        for filepath, result in batch_result.file_results.items():
+            if result['status'] == 'failed':
+                click.echo(f"  • {filepath}: {result['reason']}")
+        click.echo()
 
 
 @cli.command()
