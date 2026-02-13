@@ -126,7 +126,7 @@ ai-governance-tool/
 ### 7. Demo Files
 
 ✅ **Files that get BLOCKED**:
-1. `user_service.py` - API key: `sk_live_51HxKj2eZvKYlo2C9x8rT3mN4pQ7wX6vU5yR8sA1bZ`, DB password: `supersecretpassword123`
+1. `user_service.py` - API key: `exampleapikey123`, DB password: `supersecretpassword123`
 2. `email_handler.py` - SMTP password: `emailpass456`, hardcoded emails
 3. `payment_processor.py` - Credit card: `4532-1234-5678-9010`
 

@@ -118,7 +118,7 @@ The `demo/legacy_code/` directory contains example files demonstrating the tool'
 ### Files that SHOULD BE BLOCKED:
 
 1. **user_service.py** - Contains:
-   - Hardcoded API key: `sk_live_51HxKj2eZvKYlo2C9x8rT3mN4pQ7wX6vU5yR8sA1bZ`
+   - Hardcoded API key: `exampleapikey123`
    - Database password: `supersecretpassword123`
    - Legacy Flask synchronous code
 
