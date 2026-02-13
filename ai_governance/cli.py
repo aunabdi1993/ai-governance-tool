@@ -13,6 +13,12 @@ from .diff_manager import DiffManager
 from .audit_logger import AuditLogger
 from .file_discoverer import FileDiscoverer
 from .batch_processor import BatchProcessor
+from .language_config import (
+    get_extensions_for_languages,
+    parse_extensions,
+    get_supported_languages,
+    get_all_extensions
+)
 
 # Initialize colorama
 init(autoreset=True)
@@ -325,7 +331,6 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
 @click.option(
     '--target',
     '-t',
-    required=True,
     help='Description of desired refactoring (e.g., "refactor to async/await patterns")'
 )
 @click.option(
@@ -356,25 +361,55 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
 )
 @click.option(
     '--pattern',
-    help='File pattern to match (e.g., "test_*.py", "*.py")'
+    help='File pattern to match (e.g., "test_*.py", "*.js")'
 )
-def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, pattern):
+@click.option(
+    '--lang',
+    '--language',
+    'languages',
+    multiple=True,
+    help='Programming language(s) to process (e.g., python, javascript, typescript). Can specify multiple times.'
+)
+@click.option(
+    '--ext',
+    '--extensions',
+    'extensions',
+    help='Comma-separated file extensions (e.g., "py,js,ts" or ".py,.js,.ts"). Overrides --lang.'
+)
+@click.option(
+    '--list-languages',
+    is_flag=True,
+    help='List all supported languages and exit'
+)
+def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, pattern,
+                  languages, extensions, list_languages):
     """Refactor multiple files or entire directories using AI.
 
+    Supports all common programming languages (Python, JavaScript, TypeScript, Java, C++, Go, Rust, etc.)
+
     PATHS can be:
-    - Multiple files: ai-governance bulk-refactor file1.py file2.py --target "..."
+    - Multiple files: ai-governance bulk-refactor file1.py file2.js --target "..."
     - Directories: ai-governance bulk-refactor src/ tests/ --target "..."
     - Mix of both: ai-governance bulk-refactor file.py src/ --target "..."
 
     Examples:
-        # Refactor all Python files in a directory
-        ai-governance bulk-refactor src/ --target "modernize to Python 3.10+"
+        # Refactor all supported files in a directory
+        ai-governance bulk-refactor src/ --target "modernize code"
 
-        # Refactor specific files
-        ai-governance bulk-refactor utils.py helpers.py --target "add type hints"
+        # Refactor only Python files
+        ai-governance bulk-refactor src/ --lang python --target "add type hints"
 
-        # Refactor all test files matching a pattern
+        # Refactor JavaScript and TypeScript files
+        ai-governance bulk-refactor src/ --lang javascript --lang typescript --target "convert to ES6+"
+
+        # Refactor specific file extensions
+        ai-governance bulk-refactor src/ --ext "js,jsx,ts,tsx" --target "refactor to hooks"
+
+        # Refactor files matching a pattern
         ai-governance bulk-refactor tests/ --pattern "test_*.py" --target "use pytest fixtures"
+
+        # List all supported languages
+        ai-governance bulk-refactor . --list-languages
 
         # Dry run to see what would be refactored
         ai-governance bulk-refactor src/ --target "..." --dry-run
@@ -382,6 +417,32 @@ def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, p
         # Auto-apply changes without confirmation
         ai-governance bulk-refactor src/ --target "..." --apply
     """
+    # Handle --list-languages flag
+    if list_languages:
+        click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}Supported Programming Languages{Style.RESET_ALL}")
+        click.echo(f"{'=' * 70}\n")
+        supported_langs = get_supported_languages()
+
+        # Display in columns
+        from .language_config import LANGUAGE_EXTENSIONS
+        for i, lang in enumerate(supported_langs, 1):
+            exts = ', '.join(sorted(LANGUAGE_EXTENSIONS[lang]))
+            click.echo(f"{i:2}. {lang:15} - {exts}")
+
+        click.echo(f"\n{Fore.YELLOW}Usage:{Style.RESET_ALL}")
+        click.echo(f"  --lang python              (refactor Python files)")
+        click.echo(f"  --lang python --lang java  (refactor Python and Java)")
+        click.echo(f"  --ext py,js,ts             (refactor specific extensions)")
+        click.echo()
+        return
+
+    # Validate that --target is provided
+    if not target:
+        click.echo(f"{Fore.RED}Error: --target/-t is required{Style.RESET_ALL}")
+        click.echo(f"\nUsage: ai-governance bulk-refactor PATHS --target \"description\"")
+        click.echo(f"       ai-governance bulk-refactor --list-languages")
+        return
+
     click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}AI Governance Tool - Bulk Refactor{Style.RESET_ALL}")
     click.echo(f"{'=' * 70}\n")
 
@@ -400,9 +461,31 @@ def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, p
     click.echo(f"{Fore.YELLOW}Policy: {policy_info['name']} (v{policy_info['version']}){Style.RESET_ALL}")
     click.echo(f"Description: {policy_info['description']}\n")
 
+    # Determine file extensions to process
+    supported_extensions = None
+    if extensions:
+        # User specified custom extensions
+        supported_extensions = parse_extensions(extensions)
+        click.echo(f"{Fore.CYAN}File extensions: {', '.join(sorted(supported_extensions))}{Style.RESET_ALL}")
+    elif languages:
+        # User specified languages
+        try:
+            supported_extensions = get_extensions_for_languages(list(languages))
+            click.echo(f"{Fore.CYAN}Languages: {', '.join(languages)}{Style.RESET_ALL}")
+            click.echo(f"File extensions: {', '.join(sorted(supported_extensions))}{Style.RESET_ALL}")
+        except ValueError as e:
+            click.echo(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+            click.echo(f"\n{Fore.YELLOW}Use --list-languages to see supported languages{Style.RESET_ALL}")
+            return
+    else:
+        # No language or extension specified - use all supported languages
+        supported_extensions = get_all_extensions()
+        click.echo(f"{Fore.CYAN}Processing all supported file types{Style.RESET_ALL}")
+        click.echo(f"{Fore.YELLOW}Tip: Use --lang or --ext to filter specific languages{Style.RESET_ALL}")
+
     # Discover files
-    click.echo(f"{Fore.CYAN}Discovering files...{Style.RESET_ALL}")
-    discoverer = FileDiscoverer(supported_extensions={'.py'})
+    click.echo(f"\n{Fore.CYAN}Discovering files...{Style.RESET_ALL}")
+    discoverer = FileDiscoverer(supported_extensions=supported_extensions)
     files = discoverer.discover_files(
         paths=list(paths),
         recursive=recursive,

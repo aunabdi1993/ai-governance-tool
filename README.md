@@ -1,11 +1,12 @@
 # AI Governance Tool
 
-A Python CLI tool demonstrating secure AI-assisted code refactoring with comprehensive security controls and audit logging.çç
+A universal CLI tool for secure AI-assisted code refactoring across **39+ programming languages** with comprehensive security controls and audit logging.
 
 ## Overview
 
 This tool showcases how to safely integrate AI-powered code refactoring into development workflows by:
 
+- **Multi-Language Support**: Works with 39+ languages including Python, Java, JavaScript, TypeScript, Go, Rust, C++, and more
 - **Security Scanning**: Detecting sensitive content (API keys, passwords, emails, credit cards) before sending code to AI
 - **Policy Enforcement**: Blocking files matching security patterns (payment systems, credentials, secrets)
 - **Audit Logging**: Recording all actions, token usage, and costs in SQLite database
@@ -43,7 +44,58 @@ This tool showcases how to safely integrate AI-powered code refactoring into dev
 - **Interactive confirmation**: Review changes before applying
 - **Secure input**: API key entry is hidden for security
 - **Global installation**: Install once, use everywhere with pipx
-- **Multi-language support**: Works with any text-based source files
+- **Bulk operations**: Refactor entire directories or multiple files at once
+
+## 🌐 Multi-Language Support
+
+The tool supports **39+ programming languages** out of the box:
+
+| Category | Languages |
+|----------|-----------|
+| **Web Development** | JavaScript, TypeScript, HTML, CSS, SCSS, PHP |
+| **Systems Programming** | C, C++, Rust, Go |
+| **JVM Languages** | Java, Kotlin, Scala, Groovy |
+| **Scripting** | Python, Ruby, Perl, Shell (Bash/Zsh/Fish), Lua |
+| **Functional** | Haskell, OCaml, F#, Elixir, Erlang, Clojure |
+| **Mobile** | Swift, Kotlin, Dart |
+| **Data & Config** | SQL, YAML, JSON, XML, Markdown, Terraform |
+| **Other** | R, MATLAB, PowerShell, Vim Script, Dockerfile, Makefile |
+
+### Language Detection
+
+```bash
+# List all supported languages
+ai-governance bulk-refactor . --list-languages
+
+# Refactor specific language(s)
+ai-governance bulk-refactor src/ --lang python --target "add type hints"
+ai-governance bulk-refactor src/ --lang java --lang kotlin --target "modernize"
+
+# Refactor specific extensions
+ai-governance bulk-refactor . --ext "js,jsx,ts,tsx" --target "convert to React hooks"
+```
+
+### Real-World Examples
+
+**Java Spring Boot Project:**
+```bash
+ai-governance bulk-refactor src/main/java --lang java --target "add comprehensive javadoc comments"
+```
+
+**JavaScript/TypeScript React App:**
+```bash
+ai-governance bulk-refactor src/components --lang typescript --target "convert class components to functional"
+```
+
+**Go Microservice:**
+```bash
+ai-governance bulk-refactor . --lang go --target "improve error handling and add context"
+```
+
+**Multi-Language Monorepo:**
+```bash
+ai-governance bulk-refactor backend/ --lang python --lang java --target "add logging"
+```
 
 ## Installation
 
@@ -122,18 +174,28 @@ When prompted, you can choose where to store your API key:
 Once installed with `pipx`, you can use `ai-governance` from **any directory**, with **any project**, in **any language**:
 
 ```bash
-# Navigate to any project
-cd ~/my-react-app
-ai-governance refactor src/App.js --target "modernize JavaScript"
-
+# Python project
 cd ~/my-python-project
-ai-governance refactor legacy.py --target "add type hints"
+ai-governance refactor legacy.py --target "add type hints and modernize to Python 3.10+"
 
-cd ~/my-go-project
-ai-governance refactor main.go --target "improve error handling"
+# Java Spring Boot project
+cd ~/my-java-app
+ai-governance bulk-refactor src/main/java --lang java --target "add comprehensive javadoc"
+
+# JavaScript/TypeScript React project
+cd ~/my-react-app
+ai-governance refactor src/App.tsx --target "convert to functional components with hooks"
+
+# Go microservice
+cd ~/my-go-service
+ai-governance bulk-refactor . --lang go --target "improve error handling with context"
+
+# Rust project
+cd ~/my-rust-project
+ai-governance refactor src/main.rs --target "add better error handling and documentation"
 ```
 
-The tool works with any text-based source files!
+The tool works seamlessly across all programming languages!
 
 ### Basic Commands
 
@@ -154,6 +216,64 @@ ai-governance refactor demo/legacy_code/utils.py --target "modernize to Python 3
 4. Continue with your refactoring
 
 No need to stop and manually edit configuration files!
+
+#### Bulk refactor multiple files or directories
+```bash
+ai-governance bulk-refactor <paths...> --target "<description>" [options]
+```
+
+Examples:
+```bash
+# Refactor entire directory (all supported languages)
+ai-governance bulk-refactor src/ --target "add comprehensive documentation"
+
+# Refactor specific language
+ai-governance bulk-refactor src/ --lang python --target "add type hints"
+
+# Refactor multiple languages
+ai-governance bulk-refactor . --lang java --lang kotlin --target "modernize code"
+
+# Refactor specific file extensions
+ai-governance bulk-refactor backend/ --ext "py,pyi" --target "update to Python 3.12"
+
+# Refactor files matching a pattern
+ai-governance bulk-refactor tests/ --pattern "test_*.py" --target "use pytest fixtures"
+
+# Mix files and directories
+ai-governance bulk-refactor src/api/ lib/utils.js main.py --target "improve error handling"
+
+# Dry run to preview what would be refactored
+ai-governance bulk-refactor src/ --lang typescript --target "..." --dry-run
+
+# Auto-apply without confirmation (use with caution)
+ai-governance bulk-refactor src/ --lang go --target "..." --apply
+```
+
+**Multi-Language Project Examples:**
+
+```bash
+# Java Spring Boot - refactor all service classes
+ai-governance bulk-refactor src/main/java/com/company/services \
+  --lang java \
+  --target "add comprehensive javadoc and improve exception handling"
+
+# React TypeScript - convert class components to functional
+ai-governance bulk-refactor src/components \
+  --lang typescript \
+  --pattern "*.tsx" \
+  --target "convert class components to functional components with hooks"
+
+# Go microservice - improve error handling
+ai-governance bulk-refactor cmd/ internal/ \
+  --lang go \
+  --target "add context to errors and improve logging"
+
+# Python data science - modernize notebooks
+ai-governance bulk-refactor notebooks/ \
+  --lang python \
+  --pattern "*.py" \
+  --target "add type hints and use modern pandas methods"
+```
 
 #### View audit logs
 ```bash
@@ -181,16 +301,57 @@ This command lets you:
 - `--dry-run`: Scan only, don't refactor
 - `--apply`: Automatically apply changes without confirmation
 
+#### `bulk-refactor` command:
+- `--target, -t`: Description of desired refactoring (required)
+- `--policy, -p`: Path to custom policy YAML file
+- `--lang, --language`: Filter by programming language (can specify multiple times)
+- `--ext, --extensions`: Comma-separated file extensions (e.g., "py,js,ts")
+- `--pattern`: Glob pattern to match files (e.g., "test_*.py")
+- `--recursive/--no-recursive`: Search directories recursively (default: enabled)
+- `--no-backup`: Skip creating backup files
+- `--dry-run`: Scan only, don't refactor
+- `--apply`: Automatically apply changes without confirmation
+- `--list-languages`: Show all supported languages and exit
+
 #### `audit` command:
 - `--limit, -l`: Number of recent logs to show (default: 50)
 - `--status, -s`: Filter by status (allowed/blocked/error/success)
 - `--stats`: Show statistics only
 
+#### `init` command:
+- No options - interactive setup wizard
+
 ## Demo
+
+### Quick Start with Different Languages
+
+Try the tool immediately with any of your projects:
+
+```bash
+# Python - Add type hints
+ai-governance refactor app.py --target "add comprehensive type hints"
+
+# Java - Add javadoc
+ai-governance refactor UserService.java --target "add javadoc to all public methods"
+
+# JavaScript - Modernize
+ai-governance refactor legacy.js --target "convert to ES6+ with async/await"
+
+# TypeScript - Improve types
+ai-governance refactor api.ts --target "use strict TypeScript types"
+
+# Go - Add error handling
+ai-governance refactor handler.go --target "improve error handling with wrapped errors"
+
+# Rust - Add documentation
+ai-governance refactor main.rs --target "add comprehensive documentation comments"
+```
+
+### Security Demo
 
 The `demo/legacy_code/` directory contains example files demonstrating the tool's security controls:
 
-### Files that SHOULD BE BLOCKED:
+#### Files that SHOULD BE BLOCKED:
 
 1. **user_service.py** - Contains:
    - Hardcoded API key: `sk_live_51HxKj2eZvKYlo2C9x8rT3mN4pQ7wX6vU5yR8sA1bZ`
@@ -206,7 +367,7 @@ The `demo/legacy_code/` directory contains example files demonstrating the tool'
    - Test credit card: `4532-1234-5678-9010`
    - Payment processing code (matches `**/payment*` pattern)
 
-### Files that SHOULD BE ALLOWED:
+#### Files that SHOULD BE ALLOWED:
 
 4. **utils.py** - Clean utility functions:
    - Date formatting and parsing
@@ -419,6 +580,60 @@ For issues or questions:
 **Want to use different keys for different projects:**
 - Use local configuration (option 2 during setup)
 - Or set `ANTHROPIC_API_KEY` environment variable per-project
+
+## Quick Reference
+
+### Common Use Cases
+
+**Refactor entire project by language:**
+```bash
+ai-governance bulk-refactor . --lang <language> --target "<description>"
+```
+
+**Refactor specific directory:**
+```bash
+ai-governance bulk-refactor src/ --target "<description>"
+```
+
+**List all supported languages:**
+```bash
+ai-governance bulk-refactor . --list-languages
+```
+
+**Dry run (preview without refactoring):**
+```bash
+ai-governance bulk-refactor <path> --target "<description>" --dry-run
+```
+
+**View what was changed:**
+```bash
+ai-governance audit
+ai-governance audit --stats
+```
+
+### Language-Specific Examples
+
+| Language | Command |
+|----------|---------|
+| **Python** | `ai-governance bulk-refactor . --lang python --target "add type hints"` |
+| **Java** | `ai-governance bulk-refactor src/main/java --lang java --target "add javadoc"` |
+| **JavaScript** | `ai-governance bulk-refactor src --lang javascript --target "modernize to ES6+"` |
+| **TypeScript** | `ai-governance bulk-refactor . --lang typescript --target "improve types"` |
+| **Go** | `ai-governance bulk-refactor . --lang go --target "add context to errors"` |
+| **Rust** | `ai-governance bulk-refactor src --lang rust --target "add documentation"` |
+| **C++** | `ai-governance bulk-refactor src --lang cpp --target "modernize to C++17"` |
+| **Ruby** | `ai-governance bulk-refactor lib --lang ruby --target "add yard documentation"` |
+
+### Project Type Examples
+
+| Project Type | Command |
+|--------------|---------|
+| **Spring Boot** | `ai-governance bulk-refactor src/main/java --lang java --target "add logging and javadoc"` |
+| **React App** | `ai-governance bulk-refactor src --ext "jsx,tsx" --target "convert to hooks"` |
+| **Django** | `ai-governance bulk-refactor . --lang python --pattern "*.py" --target "add type hints"` |
+| **Node.js API** | `ai-governance bulk-refactor src --lang javascript --target "add JSDoc and error handling"` |
+| **Go CLI** | `ai-governance bulk-refactor cmd --lang go --target "improve error messages"` |
+| **Rust Binary** | `ai-governance bulk-refactor src --lang rust --target "add better documentation"` |
 
 ## Acknowledgments
 

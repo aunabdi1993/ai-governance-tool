@@ -19,9 +19,14 @@ class FileDiscoverer:
 
         Args:
             supported_extensions: Set of supported file extensions (e.g., {'.py', '.js'})
-                                If None, defaults to Python files only.
+                                If None, all common programming language files are supported.
         """
-        self.supported_extensions = supported_extensions or {'.py'}
+        if supported_extensions is None:
+            # Import here to avoid circular imports
+            from .language_config import get_all_extensions
+            self.supported_extensions = get_all_extensions()
+        else:
+            self.supported_extensions = supported_extensions
 
     def discover_files(self, paths: List[str], recursive: bool = True,
                        pattern: str = None) -> List[Path]:
