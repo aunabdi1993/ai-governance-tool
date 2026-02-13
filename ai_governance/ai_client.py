@@ -89,13 +89,67 @@ class AIClient:
             }
 
         except Exception as e:
+            # Parse error for user-friendly messages
+            error_message = self._parse_api_error(e)
+
             return {
                 'success': False,
-                'error': str(e),
+                'error': error_message,
                 'tokens_used': {'input': 0, 'output': 0, 'total': 0},
                 'cost': 0.0,
                 'model': self.model
             }
+
+    def _parse_api_error(self, error: Exception) -> str:
+        """Parse API errors into user-friendly messages.
+
+        Args:
+            error: Exception from API call
+
+        Returns:
+            User-friendly error message
+        """
+        error_str = str(error)
+
+        # Check for specific error types
+        if 'rate_limit_error' in error_str or '429' in error_str:
+            return (
+                "Rate limit exceeded. You're making requests too quickly. "
+                "Please wait a moment and try again."
+            )
+
+        elif 'insufficient_quota' in error_str or 'quota' in error_str.lower():
+            return (
+                "API quota exceeded. Your account has run out of credits. "
+                "Please check your usage at https://console.anthropic.com/ "
+                "and add more credits to continue."
+            )
+
+        elif 'invalid_api_key' in error_str or 'authentication_error' in error_str or '401' in error_str:
+            return (
+                "Invalid API key. Please check your API key is correct. "
+                "Run 'ai-governance init' to reconfigure."
+            )
+
+        elif 'overloaded_error' in error_str or '529' in error_str:
+            return (
+                "Anthropic's API is temporarily overloaded. "
+                "Please wait a few moments and try again."
+            )
+
+        elif 'timeout' in error_str.lower() or 'timed out' in error_str.lower():
+            return (
+                "Request timed out. The API took too long to respond. "
+                "Please try again with a smaller file or simpler refactoring goal."
+            )
+
+        elif 'network' in error_str.lower() or 'connection' in error_str.lower():
+            return (
+                "Network error. Please check your internet connection and try again."
+            )
+
+        # Generic error - show original message
+        return f"API error: {error_str}"
 
     def _build_refactor_prompt(
         self,
