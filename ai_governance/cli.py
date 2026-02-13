@@ -23,16 +23,9 @@ from .language_config import (
 # Initialize colorama
 init(autoreset=True)
 
-# Load environment variables from multiple sources
-# Priority: 1) Existing env vars, 2) ~/.config/ai-governance/.env, 3) Current directory .env
-config_dir = Path.home() / '.config' / 'ai-governance'
-global_env = config_dir / '.env'
-
-# Load from global config if it exists
-if global_env.exists():
-    load_dotenv(global_env)
-
-# Load from current directory (can override global config)
+# Load environment variables from current directory only
+# This allows users to optionally set API keys via .env files
+# but the tool itself never creates these files for security
 load_dotenv()
 
 
@@ -69,48 +62,16 @@ def ensure_api_key() -> bool:
         click.echo(f"\n{Fore.RED}Invalid API key provided{Style.RESET_ALL}")
         return False
 
-    # Set it for current session
+    # Set it for current session only (more secure)
     os.environ['ANTHROPIC_API_KEY'] = api_key
 
-    # Ask if they want to save it
-    click.echo(f"\n{Fore.YELLOW}Where would you like to save this API key?{Style.RESET_ALL}")
-    click.echo("1. Global config (recommended) - Available for all projects")
-    click.echo("   Location: ~/.config/ai-governance/.env")
-    click.echo("2. Current directory only")
-    click.echo("   Location: ./.env")
-    click.echo("3. Don't save (use only for this session)")
+    click.echo(f"\n{Fore.GREEN}✅ API key set for this session{Style.RESET_ALL}")
+    click.echo(f"{Fore.YELLOW}Note: For security, the key is NOT saved to disk.{Style.RESET_ALL}")
+    click.echo(f"{Fore.CYAN}You'll be prompted again in the next session.{Style.RESET_ALL}\n")
 
-    save_choice = click.prompt(
-        "\nEnter your choice",
-        type=click.Choice(['1', '2', '3']),
-        default='1'
-    )
-
-    if save_choice == '1':
-        # Save to global config
-        config_dir = Path.home() / '.config' / 'ai-governance'
-        config_dir.mkdir(parents=True, exist_ok=True)
-        env_path = config_dir / '.env'
-
-        with open(env_path, 'w') as f:
-            f.write(f"# AI Governance Tool Configuration\n\n")
-            f.write(f"ANTHROPIC_API_KEY={api_key}\n")
-
-        click.echo(f"\n{Fore.GREEN}✅ API key saved to global configuration{Style.RESET_ALL}")
-        click.echo(f"Location: {env_path}\n")
-
-    elif save_choice == '2':
-        # Save to local directory
-        env_path = Path.cwd() / '.env'
-
-        with open(env_path, 'w') as f:
-            f.write(f"# AI Governance Tool Configuration\n\n")
-            f.write(f"ANTHROPIC_API_KEY={api_key}\n")
-
-        click.echo(f"\n{Fore.GREEN}✅ API key saved to local .env file{Style.RESET_ALL}\n")
-    else:
-        # Don't save, just use for this session
-        click.echo(f"\n{Fore.CYAN}API key will be used for this session only{Style.RESET_ALL}\n")
+    # Show how to set it permanently via environment if they want
+    click.echo(f"{Fore.DIM}Tip: To avoid re-entering, set environment variable:{Style.RESET_ALL}")
+    click.echo(f"{Fore.DIM}  export ANTHROPIC_API_KEY='your_key_here'{Style.RESET_ALL}\n")
 
     return True
 
@@ -608,37 +569,23 @@ def init():
         click.echo("Please run this command again when you have a valid API key.\n")
         return
 
-    # Ask where to save
-    click.echo(f"\n{Fore.YELLOW}Step 2: Choose Configuration Location{Style.RESET_ALL}")
-    click.echo("1. Global (recommended) - Available from any project")
-    click.echo("   Location: ~/.config/ai-governance/.env")
-    click.echo("2. Local - Only for this project directory")
-    click.echo("   Location: ./.env")
+    # Verify the key works by setting it temporarily
+    os.environ['ANTHROPIC_API_KEY'] = api_key
 
-    choice = click.prompt("\nEnter your choice", type=click.Choice(['1', '2']), default='1')
+    click.echo(f"\n{Fore.GREEN}✅ API key validated!{Style.RESET_ALL}\n")
 
-    if choice == '1':
-        # Global configuration
-        config_dir = Path.home() / '.config' / 'ai-governance'
-        config_dir.mkdir(parents=True, exist_ok=True)
-        env_path = config_dir / '.env'
+    # Explain the security model
+    click.echo(f"{Fore.YELLOW}Security Note:{Style.RESET_ALL}")
+    click.echo("For security, API keys are NOT saved to disk by this tool.")
+    click.echo("You'll be prompted to enter your key when starting each session.\n")
 
-        with open(env_path, 'w') as f:
-            f.write(f"# AI Governance Tool Configuration\n\n")
-            f.write(f"ANTHROPIC_API_KEY={api_key}\n")
+    click.echo(f"{Fore.CYAN}If you prefer to set it permanently, add this to your shell profile:{Style.RESET_ALL}")
+    click.echo(f"  export ANTHROPIC_API_KEY='{api_key[:10]}...'\n")
 
-        click.echo(f"\n{Fore.GREEN}✅ Configuration saved successfully!{Style.RESET_ALL}")
-        click.echo(f"Location: {env_path}\n")
-    else:
-        # Local configuration
-        env_path = Path.cwd() / '.env'
-
-        with open(env_path, 'w') as f:
-            f.write(f"# AI Governance Tool Configuration\n\n")
-            f.write(f"ANTHROPIC_API_KEY={api_key}\n")
-
-        click.echo(f"\n{Fore.GREEN}✅ Configuration saved successfully!{Style.RESET_ALL}")
-        click.echo(f"Location: {env_path}\n")
+    click.echo(f"{Fore.CYAN}Shell profile locations:{Style.RESET_ALL}")
+    click.echo("  Bash: ~/.bashrc or ~/.bash_profile")
+    click.echo("  Zsh:  ~/.zshrc")
+    click.echo("  Fish: ~/.config/fish/config.fish\n")
 
     # Show success message and next steps
     click.echo(f"{Fore.GREEN}🎉 Setup complete! You're ready to use AI Governance Tool.{Style.RESET_ALL}\n")

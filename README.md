@@ -151,21 +151,20 @@ ai-governance refactor myfile.py --target "modernize code"
 
 The tool will detect the missing API key and walk you through setup interactively!
 
-### Configuration Options
+### API Key Configuration
 
-When prompted, you can choose where to store your API key:
+**Security-First Approach:**
 
-1. **Global** (recommended) - `~/.config/ai-governance/.env`
-   - Available from any project directory
-   - Best for personal use
+For maximum security, the tool **does NOT save your API key to disk**. You'll be prompted to enter it when starting each session (input is hidden).
 
-2. **Local** - `./.env` in current directory
-   - Project-specific configuration
-   - Good for team projects with different keys
+**If you prefer convenience over security**, you can set an environment variable:
 
-3. **Session-only** - Environment variable
-   - Not saved to disk
-   - Perfect for one-time use or testing
+```bash
+# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
+export ANTHROPIC_API_KEY='your_api_key_here'
+```
+
+This way, the key is managed by your system (not by the tool), and you won't be prompted each time.
 
 ## Usage
 
@@ -212,10 +211,10 @@ ai-governance refactor demo/legacy_code/utils.py --target "modernize to Python 3
 **First-time users**: If you haven't configured an API key, the tool will:
 1. Detect the missing key
 2. Prompt you to enter it (securely, input is hidden)
-3. Ask where to save it
+3. Use it for the current session only
 4. Continue with your refactoring
 
-No need to stop and manually edit configuration files!
+**Security Note:** Your API key is NOT saved to disk. You'll be prompted again in the next session.
 
 #### Bulk refactor multiple files or directories
 ```bash
@@ -559,27 +558,27 @@ MIT License - See LICENSE file for details
 
 For issues or questions:
 - Check the audit logs: `ai-governance audit`
-- Reconfigure API key: `ai-governance init`
-- Check global config: `cat ~/.config/ai-governance/.env`
-- Check local config: `cat .env` (in your project directory)
+- Verify API key is set: `echo $ANTHROPIC_API_KEY`
+- Run init wizard: `ai-governance init`
 - Review the default policy (bundled with package)
 
 ### Troubleshooting
 
 **"API key not found" error:**
-- Run `ai-governance init` to set up your key
-- Or simply try a refactor command - it will prompt you interactively
+- The tool will automatically prompt you to enter your key
+- Or set it as an environment variable: `export ANTHROPIC_API_KEY='your_key'`
 
 **Tool not found after installation:**
 - With pipx: Make sure `~/.local/bin` is in your PATH
 - Run `pipx ensurepath` and restart your terminal
 
 **Want to change API key:**
-- Run `ai-governance init` and choose to reconfigure
+- Just enter a different key when prompted
+- Or update your environment variable
 
 **Want to use different keys for different projects:**
-- Use local configuration (option 2 during setup)
-- Or set `ANTHROPIC_API_KEY` environment variable per-project
+- Set `ANTHROPIC_API_KEY` environment variable per-project
+- Or enter the appropriate key when prompted
 
 ## Quick Reference
 
