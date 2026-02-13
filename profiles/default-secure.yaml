@@ -1,0 +1,68 @@
+# AI Governance Security Policy Profile
+# This profile defines what files and patterns should be blocked from AI processing
+
+name: "default-secure"
+version: "1.0"
+description: "Default security profile blocking sensitive files and patterns"
+
+# File patterns to block (glob patterns)
+blocked_file_patterns:
+  - "**/payment*"
+  - "**/.env*"
+  - "**/secrets/**"
+  - "**/credentials*"
+  - "**/*_secret*"
+
+# Sensitive content patterns (regex)
+sensitive_patterns:
+  api_keys:
+    pattern: '(api[_-]?key|apikey|[_-]?key)\s*[=:]\s*["'']?[a-zA-Z0-9_\-]{20,}'
+    description: "API keys and tokens"
+    severity: "high"
+
+  stripe_keys:
+    pattern: 'sk_(live|test)_[a-zA-Z0-9]{20,}'
+    description: "Stripe API keys"
+    severity: "critical"
+
+  aws_keys:
+    pattern: 'AKIA[0-9A-Z]{16}'
+    description: "AWS access keys"
+    severity: "critical"
+
+  passwords:
+    pattern: '(password|pwd|passwd|pass)\s*[=:]\s*["'']?[^\s"'';]{6,}'
+    description: "Password assignments"
+    severity: "high"
+
+  emails:
+    pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    description: "Email addresses"
+    severity: "medium"
+
+  credit_cards:
+    pattern: '\b(?:\d{4}[-\s]?){3}\d{4}\b'
+    description: "Credit card numbers"
+    severity: "critical"
+
+  private_keys:
+    pattern: '-----BEGIN (RSA |EC )?PRIVATE KEY-----'
+    description: "Private cryptographic keys"
+    severity: "critical"
+
+  jwt_tokens:
+    pattern: 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+    description: "JWT tokens"
+    severity: "high"
+
+# Cost limits (optional)
+cost_limits:
+  max_cost_per_request: 1.0  # USD
+  max_tokens_per_request: 10000
+
+# Logging settings
+logging:
+  enabled: true
+  log_blocked: true
+  log_allowed: true
+  log_errors: true
