@@ -5,6 +5,11 @@ import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from fnmatch import fnmatch
+try:
+    from importlib.resources import files
+except ImportError:
+    # Python < 3.9
+    from importlib_resources import files
 
 
 class PolicyEngine:
@@ -17,8 +22,13 @@ class PolicyEngine:
             policy_path: Path to YAML policy file. Defaults to profiles/default-secure.yaml
         """
         if policy_path is None:
-            # Default to the profiles directory relative to project root
-            policy_path = Path(__file__).parent.parent / "profiles" / "default-secure.yaml"
+            # Use package resources to find the default policy file
+            try:
+                pkg_files = files('ai_governance')
+                policy_path = pkg_files / 'profiles' / 'default-secure.yaml'
+            except Exception:
+                # Fallback for development environment
+                policy_path = Path(__file__).parent / "profiles" / "default-secure.yaml"
 
         self.policy_path = Path(policy_path)
         self.policy = self._load_policy()

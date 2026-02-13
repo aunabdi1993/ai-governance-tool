@@ -40,6 +40,6 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "ai_governance": [],
+        "ai_governance": ["profiles/*.yaml"],
     },
 )
