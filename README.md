@@ -33,7 +33,14 @@ This tool showcases how to safely integrate AI-powered code refactoring into dev
   - Reason for block/allow decisions
   - Token usage and costs
   - Security findings
+  - Original and refactored code snapshots
 - **Query interface**: Filter logs by status, view statistics
+- **Web Dashboard**: Visual analytics and monitoring
+  - Real-time cost and token usage tracking
+  - Interactive charts (day/week/month/all-time views)
+  - Side-by-side code diff visualization
+  - Detailed request history with filtering
+  - REST API for programmatic access
 
 ### 🎨 Developer Experience
 
@@ -280,6 +287,22 @@ ai-governance audit
 ai-governance audit --status blocked
 ai-governance audit --stats
 ```
+
+#### Launch the web dashboard
+```bash
+ai-governance dashboard
+ai-governance dashboard --port 8080
+ai-governance dashboard --host 0.0.0.0 --port 3000
+```
+
+The web dashboard provides:
+- Visual analytics with interactive charts
+- Cost and token usage tracking over time
+- Detailed audit log viewer with filtering
+- Side-by-side code diff visualization
+- REST API for programmatic access
+
+See [AUDIT_DASHBOARD.md](AUDIT_DASHBOARD.md) for complete dashboard documentation.
 
 #### Initialize or reconfigure
 ```bash

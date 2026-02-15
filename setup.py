@@ -32,6 +32,7 @@ setup(
         "pyyaml>=6.0",
         "colorama>=0.4.6",
         "python-dotenv>=1.0.0",
+        "flask>=3.0.0",
     ],
     entry_points={
         "console_scripts": [
@@ -40,6 +41,10 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "ai_governance": ["profiles/*.yaml"],
+        "ai_governance": [
+            "profiles/*.yaml",
+            "templates/*.html",
+            "static/*"
+        ],
     },
 )

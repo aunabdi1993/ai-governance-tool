@@ -227,7 +227,9 @@ class BatchProcessor:
                 tokens_used=result['tokens_used']['total'],
                 cost=result['cost'],
                 model=result['model'],
-                target_description=target
+                target_description=target,
+                original_code=scan_result['content'],
+                refactored_code=result['refactored_code']
             )
 
             # Apply changes if in batch mode (we auto-apply in batch)

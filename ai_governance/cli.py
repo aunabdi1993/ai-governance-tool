@@ -261,7 +261,9 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
             tokens_used=result['tokens_used']['total'],
             cost=result['cost'],
             model=result['model'],
-            target_description=target
+            target_description=target,
+            original_code=scan_result['content'],
+            refactored_code=result['refactored_code']
         )
 
         # Ask to apply changes (unless --apply flag is set)
@@ -666,6 +668,52 @@ def audit(limit, status, stats):
 
     except Exception as e:
         click.echo(f"{Fore.RED}Error reading audit logs: {e}{Style.RESET_ALL}")
+
+
+@cli.command()
+@click.option(
+    '--host',
+    default='127.0.0.1',
+    help='Host to bind the server to (default: 127.0.0.1)'
+)
+@click.option(
+    '--port',
+    '-p',
+    default=5000,
+    help='Port to bind the server to (default: 5000)'
+)
+@click.option(
+    '--no-debug',
+    is_flag=True,
+    help='Disable debug mode'
+)
+def dashboard(host, port, no_debug):
+    """Launch the web-based audit dashboard.
+
+    The dashboard provides a visual interface to view audit logs,
+    track costs and token usage over time, and analyze refactoring patterns.
+
+    Example:
+        ai-governance dashboard
+        ai-governance dashboard --port 8080
+    """
+    click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}AI Governance Tool - Dashboard{Style.RESET_ALL}")
+    click.echo(f"{'=' * 70}\n")
+
+    try:
+        from .web_ui import run_server
+
+        click.echo(f"{Fore.GREEN}Starting web dashboard...{Style.RESET_ALL}")
+        click.echo(f"{Fore.YELLOW}Open your browser to: http://{host}:{port}{Style.RESET_ALL}\n")
+
+        run_server(host=host, port=port, debug=not no_debug)
+
+    except ImportError as e:
+        click.echo(f"{Fore.RED}Error: Flask is not installed{Style.RESET_ALL}")
+        click.echo(f"{Fore.YELLOW}Install it with: pip install flask{Style.RESET_ALL}")
+        click.echo(f"{Fore.DIM}Full error: {e}{Style.RESET_ALL}")
+    except Exception as e:
+        click.echo(f"{Fore.RED}Error starting dashboard: {e}{Style.RESET_ALL}")
 
 
 if __name__ == '__main__':
