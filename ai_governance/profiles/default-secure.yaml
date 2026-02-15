@@ -12,6 +12,7 @@ blocked_file_patterns:
   - "**/secrets/**"
   - "**/credentials*"
   - "**/*_secret*"
+  - "**/controller*"
 
 # Sensitive content patterns (regex)
 sensitive_patterns:

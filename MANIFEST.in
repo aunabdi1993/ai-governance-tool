@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include ai_governance/profiles *.yaml
+recursive-include ai_governance/templates *.html
+recursive-include ai_governance/static *
