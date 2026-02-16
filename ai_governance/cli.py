@@ -13,6 +13,7 @@ from .diff_manager import DiffManager
 from .audit_logger import AuditLogger
 from .file_discoverer import FileDiscoverer
 from .batch_processor import BatchProcessor
+from .codebase_refactor import CodebaseRefactor
 from .language_config import (
     get_extensions_for_languages,
     parse_extensions,
@@ -524,6 +525,217 @@ def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, p
 
 
 @cli.command()
+@click.argument('paths', nargs=-1, required=True, type=click.Path())
+@click.option(
+    '--target',
+    '-t',
+    required=True,
+    help='Description of desired refactoring (e.g., "refactor to async/await patterns")'
+)
+@click.option(
+    '--policy',
+    '-p',
+    type=click.Path(exists=True),
+    help='Path to policy YAML file (default: profiles/default-secure.yaml)'
+)
+@click.option(
+    '--no-backup',
+    is_flag=True,
+    help='Do not create backup files'
+)
+@click.option(
+    '--dry-run',
+    is_flag=True,
+    help='Scan and analyze, but do not apply changes'
+)
+@click.option(
+    '--no-validation',
+    is_flag=True,
+    help='Disable cross-file validation'
+)
+@click.option(
+    '--enable-type-checking',
+    is_flag=True,
+    help='Enable external type checkers (mypy, tsc)'
+)
+@click.option(
+    '--enable-testing',
+    is_flag=True,
+    help='Run tests to validate refactored code'
+)
+@click.option(
+    '--no-impact-analysis',
+    is_flag=True,
+    help='Disable change impact analysis'
+)
+@click.option(
+    '--no-resume',
+    is_flag=True,
+    help='Disable checkpoint/resume functionality'
+)
+@click.option(
+    '--resume',
+    'resume_session',
+    help='Resume from a previous session (provide session ID)'
+)
+@click.option(
+    '--no-plan',
+    is_flag=True,
+    help='Skip displaying refactoring plan'
+)
+@click.option(
+    '--recursive/--no-recursive',
+    default=True,
+    help='Recursively search directories (default: enabled)'
+)
+@click.option(
+    '--pattern',
+    help='File pattern to match (e.g., "test_*.py", "*.js")'
+)
+@click.option(
+    '--lang',
+    '--language',
+    'languages',
+    multiple=True,
+    help='Programming language(s) to process (e.g., python, javascript, typescript). Can specify multiple times.'
+)
+@click.option(
+    '--ext',
+    '--extensions',
+    'extensions',
+    help='Comma-separated file extensions (e.g., "py,js,ts" or ".py,.js,.ts"). Overrides --lang.'
+)
+def codebase_refactor(paths, target, policy, no_backup, dry_run, no_validation,
+                      enable_type_checking, enable_testing, no_impact_analysis,
+                      no_resume, resume_session, no_plan, recursive, pattern, languages, extensions):
+    """Refactor entire codebase with dependency awareness (ENHANCED).
+
+    This advanced command provides intelligent, context-aware refactoring with:
+    - 🔍 Call graph analysis to understand function relationships
+    - 🎯 Smart context selection for better AI understanding
+    - 📋 Refactoring plan generation and review
+    - ✅ Test-driven validation (runs your test suite)
+    - 📊 Change impact analysis (risk assessment)
+    - 💾 Checkpoint/resume for large codebases
+    - 🔐 Cross-file validation for breaking changes
+
+    PATHS can be:
+    - Multiple files: ai-governance codebase-refactor file1.py file2.py --target "..."
+    - Directories: ai-governance codebase-refactor src/ --target "..."
+    - Mix of both: ai-governance codebase-refactor file.py src/ --target "..."
+
+    Examples:
+        # Full-featured refactoring with all validations
+        ai-governance codebase-refactor src/ --target "modernize to Python 3.12" \\
+          --enable-testing --enable-type-checking
+
+        # Refactor with impact analysis
+        ai-governance codebase-refactor src/ --target "add async/await"
+
+        # Resume interrupted session
+        ai-governance codebase-refactor --resume refactor_20250216_143022_abc123 \\
+          --target "modernize code"
+
+        # Dry run to preview changes and plan
+        ai-governance codebase-refactor src/ --target "refactor classes" --dry-run
+
+        # Quick exploratory refactoring (skip validations)
+        ai-governance codebase-refactor src/ --target "experiment" \\
+          --no-validation --no-impact-analysis --no-plan
+    """
+    click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}AI Governance Tool - Codebase Refactor{Style.RESET_ALL}")
+    click.echo(f"{'=' * 70}\n")
+
+    # Determine file extensions to process
+    supported_extensions = None
+    if extensions:
+        supported_extensions = parse_extensions(extensions)
+        click.echo(f"{Fore.CYAN}File extensions: {', '.join(sorted(supported_extensions))}{Style.RESET_ALL}")
+    elif languages:
+        try:
+            supported_extensions = get_extensions_for_languages(list(languages))
+            click.echo(f"{Fore.CYAN}Languages: {', '.join(languages)}{Style.RESET_ALL}")
+        except ValueError as e:
+            click.echo(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+            return
+    else:
+        # Default to all supported languages
+        supported_extensions = get_all_extensions()
+        click.echo(f"{Fore.CYAN}Processing all supported file types{Style.RESET_ALL}")
+
+    # Discover files
+    click.echo(f"{Fore.CYAN}Discovering files...{Style.RESET_ALL}")
+    discoverer = FileDiscoverer(supported_extensions=supported_extensions)
+    files = discoverer.discover_files(
+        paths=list(paths),
+        recursive=recursive,
+        pattern=pattern
+    )
+
+    if not files:
+        click.echo(f"{Fore.YELLOW}No files found matching criteria{Style.RESET_ALL}")
+        return
+
+    # Confirm before proceeding
+    if not dry_run:
+        click.echo(f"\n{Fore.YELLOW}This will refactor {len(files)} file(s) with dependency awareness.{Style.RESET_ALL}")
+        click.echo(f"{Fore.YELLOW}Files will be analyzed for dependencies and refactored in groups.{Style.RESET_ALL}")
+
+        if not click.confirm("\nDo you want to continue?", default=True):
+            click.echo(f"{Fore.YELLOW}Operation cancelled{Style.RESET_ALL}")
+            return
+
+    # Ensure API key is configured
+    if not dry_run and not ensure_api_key():
+        click.echo(f"\n{Fore.RED}Cannot proceed without API key{Style.RESET_ALL}")
+        return
+
+    # Get API key
+    api_key = os.getenv('ANTHROPIC_API_KEY')
+    if not api_key and not dry_run:
+        click.echo(f"{Fore.RED}API key not found{Style.RESET_ALL}")
+        return
+
+    # Initialize codebase refactor orchestrator
+    policy_path = policy or "ai_governance/profiles/default-secure.yaml"
+
+    try:
+        refactorer = CodebaseRefactor(
+            api_key=api_key,
+            policy_path=policy_path,
+            enable_validation=not no_validation,
+            enable_type_checking=enable_type_checking,
+            enable_testing=enable_testing,
+            enable_impact_analysis=not no_impact_analysis,
+            enable_resume=not no_resume,
+            show_plan=not no_plan
+        )
+
+        # Run codebase refactoring
+        summary = refactorer.refactor_codebase(
+            file_paths=files,
+            target=target,
+            dry_run=dry_run,
+            create_backup=not no_backup,
+            resume_session=resume_session
+        )
+
+        # Show final message
+        if summary['successful'] == summary['total_files']:
+            click.echo(f"{Fore.GREEN}✅ All files refactored successfully!{Style.RESET_ALL}")
+        elif summary['successful'] > 0:
+            click.echo(f"{Fore.YELLOW}⚠️  Partial success - some files failed{Style.RESET_ALL}")
+        else:
+            click.echo(f"{Fore.RED}✗ Refactoring failed{Style.RESET_ALL}")
+
+    except Exception as e:
+        click.echo(f"\n{Fore.RED}Error during codebase refactoring: {e}{Style.RESET_ALL}")
+        import traceback
+        if '--debug' in os.sys.argv:
+            traceback.print_exc()
+
+
+@cli.command()
 def init():
     """Initialize AI Governance configuration.
 
@@ -668,6 +880,80 @@ def audit(limit, status, stats):
 
     except Exception as e:
         click.echo(f"{Fore.RED}Error reading audit logs: {e}{Style.RESET_ALL}")
+
+
+@cli.command()
+@click.option(
+    '--list',
+    'list_sessions',
+    is_flag=True,
+    help='List all saved refactoring sessions'
+)
+@click.option(
+    '--resume',
+    'session_id',
+    help='Resume a specific session by ID'
+)
+@click.option(
+    '--delete',
+    'delete_session',
+    help='Delete a specific session by ID'
+)
+@click.option(
+    '--clean',
+    'clean_days',
+    type=int,
+    help='Delete sessions older than specified days'
+)
+def sessions(list_sessions, session_id, delete_session, clean_days):
+    """Manage refactoring sessions (list, resume, delete).
+
+    Examples:
+        ai-governance sessions --list
+        ai-governance sessions --resume refactor_20250216_143022_abc123
+        ai-governance sessions --delete refactor_20250216_143022_abc123
+        ai-governance sessions --clean 30
+    """
+    from .refactor_state import RefactorState
+
+    click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}AI Governance Tool - Session Management{Style.RESET_ALL}")
+    click.echo(f"{'=' * 70}\n")
+
+    state_manager = RefactorState()
+
+    if list_sessions:
+        state_manager.display_sessions()
+
+    elif session_id:
+        # Resume session
+        if not state_manager.can_resume(session_id):
+            click.echo(f"{Fore.RED}Session {session_id} not found or has no pending files{Style.RESET_ALL}")
+            return
+
+        resume_info = state_manager.get_resume_info(session_id)
+        click.echo(f"{Fore.CYAN}Session: {session_id}{Style.RESET_ALL}")
+        click.echo(f"Target: {resume_info.get('target', 'Unknown')}")
+        click.echo(f"Pending files: {len(resume_info.get('pending_files', []))}")
+        click.echo()
+
+        if click.confirm("Resume this session?", default=True):
+            # User should use codebase-refactor --resume instead
+            click.echo(f"\n{Fore.YELLOW}To resume, run:{Style.RESET_ALL}")
+            click.echo(f"  ai-governance codebase-refactor --resume {session_id} --target \"{resume_info.get('target', '')}\" ...")
+
+    elif delete_session:
+        if state_manager.delete_checkpoint(delete_session):
+            click.echo(f"{Fore.GREEN}✓ Session {delete_session} deleted{Style.RESET_ALL}")
+        else:
+            click.echo(f"{Fore.RED}✗ Session {delete_session} not found{Style.RESET_ALL}")
+
+    elif clean_days is not None:
+        deleted = state_manager.clean_old_checkpoints(days=clean_days)
+        click.echo(f"{Fore.GREEN}✓ Deleted {deleted} session(s) older than {clean_days} days{Style.RESET_ALL}")
+
+    else:
+        # Default: list sessions
+        state_manager.display_sessions()
 
 
 @cli.command()

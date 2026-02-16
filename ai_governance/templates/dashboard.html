@@ -347,6 +347,91 @@
             font-style: italic;
         }
 
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .pagination-info {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .pagination-btn {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            border-color: #667eea;
+            color: #667eea;
+            transform: translateY(-1px);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .pagination-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .page-number {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .page-number:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .page-number.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .per-page-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .per-page-selector select {
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+
         @media (max-width: 768px) {
             .charts-grid {
                 grid-template-columns: 1fr;
@@ -364,6 +449,27 @@
             .filter-group {
                 flex-direction: column;
                 align-items: stretch;
+            }
+
+            .pagination {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .pagination-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .pagination-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .page-number {
+                padding: 6px 10px;
+                font-size: 12px;
+                min-width: 35px;
             }
         }
     </style>
@@ -456,15 +562,23 @@
     <script>
         let costChart = null;
         let tokensChart = null;
+        let currentPage = 1;
+        let perPage = 20;
+        let paginationData = null;
 
         // Load initial data
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
         });
 
-        async function loadData() {
+        async function loadData(resetPage = true) {
             const timeframe = document.getElementById('timeframe').value;
             const statusFilter = document.getElementById('statusFilter').value;
+
+            // Reset to page 1 when filters change
+            if (resetPage) {
+                currentPage = 1;
+            }
 
             try {
                 // Load statistics
@@ -581,7 +695,11 @@
         }
 
         async function loadLogs(timeframe, status) {
-            const params = new URLSearchParams({ timeframe, limit: 100 });
+            const params = new URLSearchParams({
+                timeframe,
+                page: currentPage,
+                per_page: perPage
+            });
             if (status) {
                 params.append('status', status);
             }
@@ -592,6 +710,8 @@
             const container = document.getElementById('logsContainer');
 
             if (data.success && data.logs.length > 0) {
+                paginationData = data.pagination;
+
                 const table = `
                     <table class="logs-table">
                         <thead>
@@ -621,11 +741,99 @@
                             `).join('')}
                         </tbody>
                     </table>
+                    ${renderPagination()}
                 `;
                 container.innerHTML = table;
             } else {
                 container.innerHTML = '<div class="no-data">No audit logs found for the selected timeframe.</div>';
             }
+        }
+
+        function renderPagination() {
+            if (!paginationData || paginationData.total_pages <= 1) {
+                return '';
+            }
+
+            const { page, total_logs, total_pages, has_previous, has_next } = paginationData;
+            const startRecord = (page - 1) * perPage + 1;
+            const endRecord = Math.min(page * perPage, total_logs);
+
+            // Generate page numbers to display
+            let pageNumbers = [];
+            const maxPagesToShow = 5;
+            let startPage = Math.max(1, page - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(total_pages, startPage + maxPagesToShow - 1);
+
+            // Adjust startPage if we're near the end
+            if (endPage - startPage < maxPagesToShow - 1) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pageNumbers.push(i);
+            }
+
+            return `
+                <div class="pagination">
+                    <div class="pagination-info">
+                        Showing ${startRecord}-${endRecord} of ${total_logs} logs
+                    </div>
+
+                    <div class="pagination-controls">
+                        <div class="per-page-selector">
+                            <label>Show:</label>
+                            <select onchange="changePerPage(this.value)">
+                                <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+                                <option value="20" ${perPage === 20 ? 'selected' : ''}>20</option>
+                                <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+                                <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
+                            </select>
+                        </div>
+
+                        <button class="pagination-btn"
+                                onclick="changePage(1)"
+                                ${!has_previous ? 'disabled' : ''}>
+                            ⟨⟨ First
+                        </button>
+
+                        <button class="pagination-btn"
+                                onclick="changePage(${page - 1})"
+                                ${!has_previous ? 'disabled' : ''}>
+                            ⟨ Previous
+                        </button>
+
+                        ${pageNumbers.map(p => `
+                            <div class="page-number ${p === page ? 'active' : ''}"
+                                 onclick="changePage(${p})">
+                                ${p}
+                            </div>
+                        `).join('')}
+
+                        <button class="pagination-btn"
+                                onclick="changePage(${page + 1})"
+                                ${!has_next ? 'disabled' : ''}>
+                            Next ⟩
+                        </button>
+
+                        <button class="pagination-btn"
+                                onclick="changePage(${total_pages})"
+                                ${!has_next ? 'disabled' : ''}>
+                            Last ⟩⟩
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function changePage(newPage) {
+            currentPage = newPage;
+            loadData(false); // Don't reset page when navigating
+        }
+
+        function changePerPage(newPerPage) {
+            perPage = parseInt(newPerPage);
+            currentPage = 1; // Reset to first page when changing per page
+            loadData(false); // Don't reset page (already set to 1)
         }
 
         async function showLogDetail(logId) {

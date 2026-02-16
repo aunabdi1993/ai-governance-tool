@@ -48,7 +48,7 @@ ai-governance dashboard --host 0.0.0.0 --port 3000
 ai-governance dashboard --no-debug
 ```
 
-## Dashboard Interface
+## Dashboard Interfacecl
 
 ### Main View
 The dashboard opens to a comprehensive overview showing:

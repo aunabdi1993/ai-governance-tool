@@ -23,28 +23,45 @@ def index():
 
 @app.route('/api/logs')
 def get_logs():
-    """Get audit logs with optional filtering.
+    """Get audit logs with optional filtering and pagination.
 
     Query params:
         timeframe: day, week, month, all (default: all)
         status: filter by status
-        limit: max records to return (default: 100)
+        page: page number (default: 1)
+        per_page: records per page (default: 20)
     """
     audit_logger = get_audit_logger()
 
     timeframe = request.args.get('timeframe', 'all')
     status = request.args.get('status')
-    limit = int(request.args.get('limit', 100))
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
 
+    # Get all logs first (without limit)
     if status:
-        logs = audit_logger.get_logs_by_status(status, limit)
+        all_logs = audit_logger.get_logs_by_status(status, limit=10000)
     else:
-        logs = audit_logger.get_logs_by_timeframe(timeframe, limit)
+        all_logs = audit_logger.get_logs_by_timeframe(timeframe, limit=10000)
+
+    # Calculate pagination
+    total_logs = len(all_logs)
+    total_pages = (total_logs + per_page - 1) // per_page  # Ceiling division
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_logs = all_logs[start_idx:end_idx]
 
     return jsonify({
         'success': True,
-        'logs': logs,
-        'count': len(logs)
+        'logs': paginated_logs,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total_logs': total_logs,
+            'total_pages': total_pages,
+            'has_previous': page > 1,
+            'has_next': page < total_pages
+        }
     })
 
 
