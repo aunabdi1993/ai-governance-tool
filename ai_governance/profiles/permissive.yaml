@@ -1,0 +1,38 @@
+# AI Governance - Permissive Security Policy
+# This template has relaxed security rules for development environments
+
+name: "permissive"
+version: "1.0"
+description: "Permissive security profile for development environments"
+
+security:
+  # Allowed file patterns (minimal restrictions)
+  allowed_patterns:
+    - "**/*.py"
+    - "**/*.js"
+    - "**/*.ts"
+    - "**/*.jsx"
+    - "**/*.tsx"
+    - "**/*.java"
+    - "**/*.go"
+    - "**/*.rs"
+    - "**/*.rb"
+    - "**/*.php"
+
+  # Blocked patterns (only critical files)
+  blocked_patterns:
+    - "**/node_modules/**"
+    - "**/.git/**"
+    - "**/venv/**"
+    - "**/__pycache__/**"
+
+  # Sensitive content detection (reduced)
+  detect_secrets:
+    enabled: true
+    patterns:
+      # Only detect obvious secrets
+      - 'sk-[a-zA-Z0-9]{32,}'  # OpenAI API keys
+      - 'AKIA[0-9A-Z]{16}'      # AWS Access Keys
+
+  # Size limits
+  max_file_size: 1048576  # 1MB

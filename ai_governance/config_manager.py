@@ -285,14 +285,14 @@ class ConfigManager:
             click.echo(f"  {Fore.GREEN}✓{Style.RESET_ALL} Project config: {configs['project']}")
         else:
             click.echo(f"  {Fore.YELLOW}○{Style.RESET_ALL} Project config: Not found")
-            click.echo(f"    {Fore.DIM}Run: ai-governance init --project{Style.RESET_ALL}")
+            click.echo(f"    {Style.DIM}Run: ai-governance init --project{Style.RESET_ALL}")
 
         # User-level
         if configs['user']:
             click.echo(f"  {Fore.GREEN}✓{Style.RESET_ALL} User config:    {configs['user']}")
         else:
             click.echo(f"  {Fore.YELLOW}○{Style.RESET_ALL} User config:    Not found")
-            click.echo(f"    {Fore.DIM}Run: ai-governance init --user{Style.RESET_ALL}")
+            click.echo(f"    {Style.DIM}Run: ai-governance init --user{Style.RESET_ALL}")
 
         # System-level
         if configs['system']:
@@ -327,6 +327,10 @@ class ConfigManager:
         """Create a permissive security template."""
         content = """# AI Governance - Permissive Security Policy
 # This template has relaxed security rules for development environments
+
+name: "permissive"
+version: "1.0"
+description: "Permissive security profile for development environments"
 
 security:
   # Allowed file patterns (minimal restrictions)
@@ -367,6 +371,10 @@ security:
         """Create a strict security template."""
         content = """# AI Governance - Strict Security Policy
 # This template has enhanced security rules for production environments
+
+name: "strict"
+version: "1.0"
+description: "Strict security profile for production environments"
 
 security:
   # Very restrictive allowed patterns
@@ -409,7 +417,7 @@ security:
       # Tokens
       - 'token[_-]?=.{8,}'
       - 'auth[_-]?=.{8,}'
-      - 'bearer[_-]+[a-zA-Z0-9_\-\.=]+'
+      - 'bearer[_-]+[a-zA-Z0-9_\\-\\.=]+'
 
       # Private keys
       - '-----BEGIN (RSA|DSA|EC|OPENSSH) PRIVATE KEY-----'

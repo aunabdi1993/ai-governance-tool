@@ -1,0 +1,63 @@
+# AI Governance - Strict Security Policy
+# This template has enhanced security rules for production environments
+
+name: "strict"
+version: "1.0"
+description: "Strict security profile for production environments"
+
+security:
+  # Very restrictive allowed patterns
+  allowed_patterns:
+    - "src/**/*.py"
+    - "src/**/*.js"
+    - "lib/**/*.py"
+    - "app/**/*.js"
+
+  # Extensive blocked patterns
+  blocked_patterns:
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/*_test.py"
+    - "**/config/**"
+    - "**/secrets/**"
+    - "**/.env*"
+    - "**/credentials/**"
+    - "**/node_modules/**"
+    - "**/.git/**"
+    - "**/venv/**"
+    - "**/__pycache__/**"
+    - "**/build/**"
+    - "**/dist/**"
+
+  # Enhanced secret detection
+  detect_secrets:
+    enabled: true
+    patterns:
+      # API Keys
+      - 'api[_-]?key[_-]?=.{8,}'
+      - 'sk-[a-zA-Z0-9]{32,}'
+      - 'AKIA[0-9A-Z]{16}'
+
+      # Passwords
+      - 'password[_-]?=.{4,}'
+      - 'passwd[_-]?=.{4,}'
+      - 'pwd[_-]?=.{4,}'
+
+      # Tokens
+      - 'token[_-]?=.{8,}'
+      - 'auth[_-]?=.{8,}'
+      - 'bearer[_-]+[a-zA-Z0-9_\-\.=]+'
+
+      # Private keys
+      - '-----BEGIN (RSA|DSA|EC|OPENSSH) PRIVATE KEY-----'
+
+      # Database URLs
+      - 'postgres://[^:]+:[^@]+@'
+      - 'mysql://[^:]+:[^@]+@'
+
+      # AWS
+      - 'aws_secret_access_key'
+      - 'aws_session_token'
+
+  # Strict size limits
+  max_file_size: 524288  # 512KB

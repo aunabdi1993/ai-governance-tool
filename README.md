@@ -457,6 +457,8 @@ bash demo.sh
 
 ## Configuration Management
 
+> **Quick Start**: See [QUICKSTART_CONFIG.md](QUICKSTART_CONFIG.md) for a 5-minute setup guide with examples!
+
 ### Multi-Level Configuration System
 
 The tool uses a **flexible configuration hierarchy** that allows project-specific security policies:
