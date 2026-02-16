@@ -14,6 +14,7 @@ from .audit_logger import AuditLogger
 from .file_discoverer import FileDiscoverer
 from .batch_processor import BatchProcessor
 from .codebase_refactor import CodebaseRefactor
+from .config_manager import ConfigManager
 from .language_config import (
     get_extensions_for_languages,
     parse_extensions,
@@ -131,7 +132,11 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
 
     # Initialize components
     try:
-        policy_engine = PolicyEngine(policy)
+        # Use ConfigManager to find appropriate policy file
+        config_manager = ConfigManager()
+        policy_path = config_manager.find_config(explicit_path=policy)
+
+        policy_engine = PolicyEngine(policy_path)
         scanner = Scanner(policy_engine)
         audit_logger = AuditLogger()
         diff_manager = DiffManager(create_backups=not no_backup)
@@ -412,7 +417,11 @@ def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, p
 
     # Initialize components
     try:
-        policy_engine = PolicyEngine(policy)
+        # Use ConfigManager to find appropriate policy file
+        config_manager = ConfigManager()
+        policy_path = config_manager.find_config(explicit_path=policy)
+
+        policy_engine = PolicyEngine(policy_path)
         scanner = Scanner(policy_engine)
         audit_logger = AuditLogger()
         diff_manager = DiffManager(create_backups=not no_backup)
@@ -696,8 +705,10 @@ def codebase_refactor(paths, target, policy, no_backup, dry_run, no_validation,
         click.echo(f"{Fore.RED}API key not found{Style.RESET_ALL}")
         return
 
-    # Initialize codebase refactor orchestrator
-    policy_path = policy or "ai_governance/profiles/default-secure.yaml"
+    # Find configuration file using ConfigManager
+    from .config_manager import ConfigManager
+    config_manager = ConfigManager()
+    policy_path = config_manager.find_config(explicit_path=policy)
 
     try:
         refactorer = CodebaseRefactor(
@@ -736,84 +747,134 @@ def codebase_refactor(paths, target, policy, no_backup, dry_run, no_validation,
 
 
 @cli.command()
-def init():
-    """Initialize AI Governance configuration.
+@click.option(
+    '--project',
+    is_flag=True,
+    help='Initialize project-level config (.ai-governance/policy.yaml)'
+)
+@click.option(
+    '--user',
+    is_flag=True,
+    help='Initialize user-level config (~/.config/ai-governance/policy.yaml)'
+)
+@click.option(
+    '--template',
+    type=click.Choice(['default-secure', 'permissive', 'strict']),
+    default='default-secure',
+    help='Security template to use'
+)
+@click.option(
+    '--force',
+    is_flag=True,
+    help='Overwrite existing configuration'
+)
+def init(project, user, template, force):
+    """Initialize AI Governance Tool configuration.
 
-    Creates configuration file for global or project-specific use.
+    Creates configuration files for security policies and API settings.
+
+    Examples:
+        # Show current configuration status
+        ai-governance init
+
+        # Initialize project-specific config
+        ai-governance init --project
+
+        # Initialize user-level defaults
+        ai-governance init --user
+
+        # Use strict security template
+        ai-governance init --project --template strict
+
+        # Initialize both levels
+        ai-governance init --project --user
     """
+    from .config_manager import ConfigManager
+
     click.echo(f"\n{Fore.CYAN}{Style.BRIGHT}AI Governance Tool - Initialization{Style.RESET_ALL}")
     click.echo(f"{'=' * 70}\n")
 
-    click.echo("Welcome to AI Governance Tool!")
-    click.echo("This tool helps you safely refactor code using AI with security controls.\n")
+    config_manager = ConfigManager()
 
-    # Check if API key already exists
-    existing_key = os.getenv('ANTHROPIC_API_KEY')
-    if existing_key and existing_key != 'your_api_key_here':
-        click.echo(f"{Fore.GREEN}✅ API key already configured{Style.RESET_ALL}\n")
-        reconfigure = click.confirm("Would you like to reconfigure it?", default=False)
-        if not reconfigure:
-            click.echo(f"\n{Fore.CYAN}Configuration unchanged. You're ready to go!{Style.RESET_ALL}")
-            click.echo(f"\nTry: ai-governance refactor <file> --target \"<description>\"\n")
-            return
+    # Create additional templates if needed
+    config_manager.create_template_files()
 
-    # Prompt for API key
-    click.echo(f"{Fore.YELLOW}Step 1: API Key Configuration{Style.RESET_ALL}")
-    click.echo("You'll need an Anthropic API key to use AI refactoring.")
-    click.echo("Get your key from: https://console.anthropic.com/\n")
+    # Handle configuration initialization
+    if project or user:
+        if project:
+            click.echo(f"{Fore.YELLOW}Creating project-level configuration...{Style.RESET_ALL}\n")
+            config_manager.init_project_config(template=template, force=force)
 
-    has_key = click.confirm("Do you have your API key ready?", default=True)
+        if user:
+            click.echo(f"\n{Fore.YELLOW}Creating user-level configuration...{Style.RESET_ALL}\n")
+            config_manager.init_user_config(template=template, force=force)
 
-    if not has_key:
-        click.echo(f"\n{Fore.CYAN}No problem! You can configure it later.{Style.RESET_ALL}")
-        click.echo("When you're ready, run this command again: ai-governance init\n")
-        click.echo("You can also configure it on your first refactor command.\n")
-        return
+        click.echo(f"\n{Fore.GREEN}✓ Configuration initialized{Style.RESET_ALL}")
+        click.echo(f"\n{Fore.YELLOW}Next steps:{Style.RESET_ALL}")
+        click.echo(f"  1. Review and customize the security policy")
+        click.echo(f"  2. Add project-specific blocked patterns")
+        click.echo(f"  3. Configure API key (see below)\n")
+    else:
+        # No flags - show configuration status
+        config_manager.show_config_status()
 
-    # Get API key from user
-    api_key = click.prompt(
-        f"\n{Fore.CYAN}Enter your Anthropic API key{Style.RESET_ALL}",
-        hide_input=True,
-        type=str
-    ).strip()
+    # Check API key
+    click.echo(f"{Fore.CYAN}API Key Configuration:{Style.RESET_ALL}\n")
 
-    # Basic validation
-    if not api_key or api_key == 'your_api_key_here':
-        click.echo(f"\n{Fore.RED}Invalid API key provided{Style.RESET_ALL}")
-        click.echo("Please run this command again when you have a valid API key.\n")
-        return
+    api_key = os.getenv("ANTHROPIC_API_KEY")
 
-    # Verify the key works by setting it temporarily
-    os.environ['ANTHROPIC_API_KEY'] = api_key
+    if api_key:
+        click.echo(f"  {Fore.GREEN}✓{Style.RESET_ALL} API Key configured")
+        click.echo(f"    Key starts with: {api_key[:7]}...")
+    else:
+        click.echo(f"  {Fore.YELLOW}○{Style.RESET_ALL} API Key not found")
+        click.echo(f"\n  To configure your API key:\n")
 
-    click.echo(f"\n{Fore.GREEN}✅ API key validated!{Style.RESET_ALL}\n")
+        click.echo(f"  1. Environment variable (recommended):")
+        click.echo(f"     export ANTHROPIC_API_KEY='your-key-here'")
+        click.echo(f"     # Add to ~/.bashrc or ~/.zshrc to make it permanent\n")
 
-    # Explain the security model
-    click.echo(f"{Fore.YELLOW}Security Note:{Style.RESET_ALL}")
-    click.echo("For security, API keys are NOT saved to disk by this tool.")
-    click.echo("You'll be prompted to enter your key when starting each session.\n")
+        click.echo(f"  2. Pass directly to commands:")
+        click.echo(f"     ai-governance refactor file.py --target \"...\" --api-key YOUR_KEY\n")
 
-    click.echo(f"{Fore.CYAN}If you prefer to set it permanently, add this to your shell profile:{Style.RESET_ALL}")
-    click.echo(f"  export ANTHROPIC_API_KEY='{api_key[:10]}...'\n")
+        if click.confirm("  Would you like to set it now?"):
+            api_key_input = click.prompt("  Enter your Anthropic API key", hide_input=True)
 
-    click.echo(f"{Fore.CYAN}Shell profile locations:{Style.RESET_ALL}")
-    click.echo("  Bash: ~/.bashrc or ~/.bash_profile")
-    click.echo("  Zsh:  ~/.zshrc")
-    click.echo("  Fish: ~/.config/fish/config.fish\n")
+            # Save to shell config
+            shell = os.getenv('SHELL', '/bin/bash')
+            if 'zsh' in shell:
+                config_file = Path.home() / '.zshrc'
+            else:
+                config_file = Path.home() / '.bashrc'
 
-    # Show success message and next steps
-    click.echo(f"{Fore.GREEN}🎉 Setup complete! You're ready to use AI Governance Tool.{Style.RESET_ALL}\n")
+            with open(config_file, 'a') as f:
+                f.write(f'\n# Anthropic API Key for AI Governance Tool\n')
+                f.write(f'export ANTHROPIC_API_KEY="{api_key_input}"\n')
 
-    click.echo(f"{Fore.CYAN}Try it out:{Style.RESET_ALL}")
-    click.echo("  ai-governance refactor <file> --target \"modernize code\"")
-    click.echo("  ai-governance refactor <file> --target \"add comments\" --dry-run")
-    click.echo("  ai-governance audit\n")
+            click.echo(f"\n  {Fore.GREEN}✓{Style.RESET_ALL} API key saved to {config_file}")
+            click.echo(f"    Run: source {config_file}")
+            click.echo(f"    Or restart your terminal\n")
 
-    click.echo(f"{Fore.CYAN}Features:{Style.RESET_ALL}")
-    click.echo("  • Security scanning - Blocks files with sensitive data")
-    click.echo("  • Audit logging - Tracks all actions in .ai-governance-audit.db")
-    click.echo("  • Cost tracking - Shows estimated costs before API calls")
-    click.echo("  • Policy controls - Customizable with --policy <path-to-yaml>\n")
+    click.echo()
+
+
+@cli.command()
+def config():
+    """Show current configuration status and file locations.
+
+    Displays:
+    - Project-level config
+    - User-level config
+    - System default config
+    - Active config being used
+
+    Examples:
+        ai-governance config
+    """
+    from .config_manager import ConfigManager
+
+    config_manager = ConfigManager()
+    config_manager.show_config_status()
 
 
 @cli.command()

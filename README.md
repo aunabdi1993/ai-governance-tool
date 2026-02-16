@@ -341,7 +341,19 @@ This command lets you:
 - `--stats`: Show statistics only
 
 #### `init` command:
-- No options - interactive setup wizard
+- `--project`: Initialize project-level configuration (`.ai-governance/policy.yaml`)
+- `--user`: Initialize user-level configuration (`~/.config/ai-governance/policy.yaml`)
+- `--template`: Specify template to use (`default-secure`, `permissive`, `strict`)
+- `--force`: Overwrite existing configuration file
+- No options: Interactive API key setup wizard
+
+#### `config` command:
+- No options - shows configuration status and active config file
+
+#### `sessions` command (for codebase-refactor):
+- `--list`: Show all refactoring sessions with status
+- `--show SESSION_ID`: Display details of a specific session
+- `--cleanup`: Remove completed session checkpoints
 
 ## Demo
 
@@ -443,35 +455,115 @@ Or use the shell script:
 bash demo.sh
 ```
 
-## Security Policy Configuration
+## Configuration Management
 
-The default security policy is defined in `profiles/default-secure.yaml`. You can customize it by:
+### Multi-Level Configuration System
 
-1. Editing the default policy file
-2. Creating a custom policy and using `--policy` flag
+The tool uses a **flexible configuration hierarchy** that allows project-specific security policies:
+
+**Configuration Priority (highest to lowest):**
+1. **Explicit path** (`--policy custom.yaml`) - Overrides all
+2. **Project-level** (`.ai-governance/policy.yaml`) - Project-specific rules
+3. **User-level** (`~/.config/ai-governance/policy.yaml`) - Personal defaults
+4. **System-level** (built-in `default-secure.yaml`) - Fallback
+
+### Quick Configuration Setup
+
+**Initialize project-specific configuration:**
+```bash
+# Create project config with default-secure template
+ai-governance init --project
+
+# Use permissive template for development
+ai-governance init --project --template permissive
+
+# Use strict template for production
+ai-governance init --project --template strict
+```
+
+**Initialize user-level configuration:**
+```bash
+# Set default policy for all your projects
+ai-governance init --user
+```
+
+**Check configuration status:**
+```bash
+ai-governance config
+```
+
+### Available Templates
+
+1. **`default-secure`** (recommended) - Balanced security for most projects
+   - Blocks common sensitive patterns
+   - Allows standard source code files
+   - 1MB file size limit
+
+2. **`permissive`** - Relaxed rules for development/internal tools
+   - Minimal restrictions
+   - Only blocks obvious secrets
+   - Good for experimentation
+
+3. **`strict`** - Enhanced security for production code
+   - Very restrictive patterns
+   - Enhanced secret detection
+   - 512KB file size limit
+
+### Configuration Use Cases
+
+**Different policies per project:**
+```bash
+# Web app - use strict policy
+cd ~/projects/webapp
+ai-governance init --project --template strict
+
+# Internal tool - use permissive policy
+cd ~/projects/internal-tool
+ai-governance init --project --template permissive
+```
+
+**Team-shared configuration:**
+```bash
+# Copy team policy to project (commit to git)
+mkdir .ai-governance
+cp /path/to/team-policy.yaml .ai-governance/policy.yaml
+git add .ai-governance/policy.yaml
+```
+
+**Temporary override:**
+```bash
+# Use explicit policy for one-off refactoring
+ai-governance refactor file.py --target "..." --policy /custom/policy.yaml
+```
 
 ### Policy Structure
 
 ```yaml
-name: "default-secure"
-version: "1.0"
-description: "Default security profile"
+security:
+  # Which files are allowed to be sent to AI
+  allowed_patterns:
+    - "**/*.py"
+    - "**/*.js"
+    - "src/**/*.ts"
 
-# File patterns to block
-blocked_file_patterns:
-  - "**/payment*"
-  - "**/.env*"
-  - "**/secrets/**"
+  # Which files should never be sent
+  blocked_patterns:
+    - "**/.env*"
+    - "**/secrets/**"
+    - "**/node_modules/**"
 
-# Content patterns to detect
-sensitive_patterns:
-  api_keys:
-    pattern: '(api[_-]?key|apikey)[\s:=]["'']?[a-zA-Z0-9_\-]{20,}'
-    description: "API keys and tokens"
-    severity: "high"
+  # Sensitive content detection
+  detect_secrets:
+    enabled: true
+    patterns:
+      - 'api[_-]?key[_-]?=.{8,}'
+      - 'sk-[a-zA-Z0-9]{32,}'  # OpenAI keys
 
-  # ... more patterns
+  # File size limits (bytes)
+  max_file_size: 1048576  # 1MB
 ```
+
+**For complete configuration documentation, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md).**
 
 ## Architecture
 

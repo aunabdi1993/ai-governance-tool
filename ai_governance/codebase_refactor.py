@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import click
+from colorama import Fore, Style
 
 from .dependency_analyzer import DependencyAnalyzer
 from .ai_client import AIClient
@@ -144,21 +145,40 @@ class CodebaseRefactor:
         # Phase 3: Security scanning
         click.echo("[3/8] Running security scans...")
         scan_results = self._scan_files(file_paths)
-        if scan_results['blocked']:
-            click.echo(f"  ✗ {len(scan_results['blocked'])} files blocked by security policy")
-            for blocked_file in scan_results['blocked']:
+
+        blocked_files = scan_results['blocked']
+        allowed_files = scan_results['allowed']
+
+        if blocked_files:
+            click.echo(f"  ⚠  {len(blocked_files)} file(s) blocked by security policy (will be skipped):")
+            for blocked_file in blocked_files[:10]:  # Show first 10
                 click.echo(f"    - {blocked_file}")
-            raise RefactorError("Security policy violations detected")
-        click.echo(f"  ✓ All {len(file_paths)} files passed security checks")
+            if len(blocked_files) > 10:
+                click.echo(f"    ... and {len(blocked_files) - 10} more")
+            click.echo()
+
+        if not allowed_files:
+            click.echo(f"  ✗ All files blocked by security policy. Nothing to refactor.")
+            raise RefactorError("All files blocked by security policy")
+
+        click.echo(f"  ✓ {len(allowed_files)} file(s) passed security checks and will be refactored")
+        if blocked_files:
+            click.echo(f"  ℹ  {len(blocked_files)} file(s) will be skipped")
         click.echo()
 
-        # Save initial checkpoint
+        # Update file list to only include allowed files
+        file_paths_to_refactor = allowed_files
+
+        # Update dependency graph to only include allowed files
+        dep_graph = self._filter_dep_graph_for_allowed_files(dep_graph, allowed_files)
+
+        # Save initial checkpoint with allowed files only
         if self.enable_resume and not dry_run:
             self.refactor_state.save_checkpoint(
                 session_id=session_id,
                 completed_files=[],
-                failed_files={},
-                pending_files=file_paths,
+                failed_files={blocked_file: "Blocked by security policy" for blocked_file in blocked_files},
+                pending_files=file_paths_to_refactor,
                 target=target,
                 dep_graph=dep_graph,
                 refactor_results={}
@@ -169,9 +189,21 @@ class CodebaseRefactor:
         refactor_results = self._refactor_in_groups(
             dep_graph,
             target,
-            file_paths,
+            file_paths_to_refactor,
             session_id
         )
+
+        # Add blocked files to results for reporting
+        for blocked_file in blocked_files:
+            refactor_results[blocked_file] = {
+                'success': False,
+                'error': 'Blocked by security policy',
+                'blocked': True,
+                'original_code': '',
+                'refactored_code': '',
+                'tokens_used': {'input': 0, 'output': 0, 'total': 0},
+                'cost': 0.0
+            }
 
         successful = sum(1 for r in refactor_results.values() if r['success'])
         click.echo(f"  ✓ Successfully refactored {successful}/{len(file_paths)} files")
@@ -292,6 +324,62 @@ class CodebaseRefactor:
             dep_graph['call_graph'] = call_graph
 
         return dep_graph
+
+    def _filter_dep_graph_for_allowed_files(self, dep_graph: Dict, allowed_files: List[str]) -> Dict:
+        """
+        Filter dependency graph to only include allowed files.
+
+        This ensures that blocked files are excluded from:
+        - File ordering
+        - Grouping
+        - Context selection
+
+        Args:
+            dep_graph: Original dependency graph
+            allowed_files: List of files that passed security checks
+
+        Returns:
+            Filtered dependency graph
+        """
+        allowed_set = set(allowed_files)
+        filtered = {}
+
+        # Filter imports
+        if 'imports' in dep_graph:
+            filtered['imports'] = {
+                f: imports for f, imports in dep_graph['imports'].items()
+                if f in allowed_set
+            }
+
+        # Filter exports
+        if 'exports' in dep_graph:
+            filtered['exports'] = {
+                f: exports for f, exports in dep_graph['exports'].items()
+                if f in allowed_set
+            }
+
+        # Filter callers
+        if 'callers' in dep_graph:
+            filtered['callers'] = dep_graph['callers']  # Keep for reference
+
+        # Filter groups (only include groups with allowed files)
+        if 'groups' in dep_graph:
+            filtered['groups'] = [
+                [f for f in group if f in allowed_set]
+                for group in dep_graph['groups']
+            ]
+            # Remove empty groups
+            filtered['groups'] = [g for g in filtered['groups'] if g]
+
+        # Filter order (only allowed files)
+        if 'order' in dep_graph:
+            filtered['order'] = [f for f in dep_graph['order'] if f in allowed_set]
+
+        # Keep call graph for reference (it has global info)
+        if 'call_graph' in dep_graph:
+            filtered['call_graph'] = dep_graph['call_graph']
+
+        return filtered
 
     def _scan_files(self, file_paths: List[str]) -> Dict:
         """Scan files for security issues."""
@@ -541,6 +629,18 @@ class CodebaseRefactor:
                     cost=result['cost'],
                     findings=[]
                 )
+            elif result.get('blocked', False):
+                # Log blocked file
+                self.audit_logger.log_action(
+                    action='codebase_refactor',
+                    filepath=file_path,
+                    status='blocked',
+                    reason='Blocked by security policy',
+                    target=target,
+                    tokens_used=0,
+                    cost=0.0,
+                    findings=[]
+                )
 
     def _analyze_impact(
         self,
@@ -628,7 +728,8 @@ class CodebaseRefactor:
     ) -> Dict:
         """Generate summary statistics."""
         successful = [r for r in refactor_results.values() if r['success']]
-        failed = [r for r in refactor_results.values() if not r['success']]
+        blocked = [r for r in refactor_results.values() if not r['success'] and r.get('blocked', False)]
+        failed = [r for r in refactor_results.values() if not r['success'] and not r.get('blocked', False)]
 
         total_cost = sum(r.get('cost', 0) for r in successful)
         total_tokens = sum(r.get('tokens_used', {}).get('total', 0) for r in successful)
@@ -636,26 +737,43 @@ class CodebaseRefactor:
         summary = {
             'total_files': len(refactor_results),
             'successful': len(successful),
+            'blocked': len(blocked),
             'failed': len(failed),
             'total_cost': total_cost,
             'total_tokens': total_tokens,
-            'groups': len(dep_graph['groups']),
+            'groups': len(dep_graph.get('groups', [])),
             'dry_run': dry_run
         }
 
         # Display summary
-        click.echo(f"{'='*60}")
+        click.echo(f"{'='*70}")
         click.echo("REFACTORING SUMMARY")
-        click.echo(f"{'='*60}")
+        click.echo(f"{'='*70}")
         click.echo(f"Total files:     {summary['total_files']}")
         click.echo(f"Successful:      {summary['successful']}")
-        click.echo(f"Failed:          {summary['failed']}")
+
+        if blocked:
+            click.echo(f"Blocked:         {summary['blocked']} (security policy)")
+
+        if failed:
+            click.echo(f"Failed:          {summary['failed']}")
+
         click.echo(f"File groups:     {summary['groups']}")
         click.echo(f"Total cost:      ${summary['total_cost']:.4f}")
         click.echo(f"Total tokens:    {summary['total_tokens']:,}")
 
         if dry_run:
             click.echo(f"\nDRY RUN - No changes were applied")
-        click.echo(f"{'='*60}\n")
+
+        # Show details about blocked files
+        if blocked:
+            click.echo(f"\n{Fore.YELLOW}Blocked Files (skipped):{Style.RESET_ALL}")
+            blocked_files = [path for path, r in refactor_results.items() if r.get('blocked', False)]
+            for bf in blocked_files[:10]:
+                click.echo(f"  • {bf}")
+            if len(blocked_files) > 10:
+                click.echo(f"  ... and {len(blocked_files) - 10} more")
+
+        click.echo(f"{'='*70}\n")
 
         return summary

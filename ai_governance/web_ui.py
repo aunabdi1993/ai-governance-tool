@@ -4,6 +4,7 @@ from flask import Flask, render_template, jsonify, request
 from pathlib import Path
 import json
 from .audit_logger import AuditLogger
+from .refactor_state import RefactorState
 
 app = Flask(__name__,
     template_folder='templates',
@@ -13,6 +14,11 @@ app = Flask(__name__,
 def get_audit_logger():
     """Get audit logger instance."""
     return AuditLogger()
+
+
+def get_refactor_state():
+    """Get refactor state manager instance."""
+    return RefactorState()
 
 
 @app.route('/')
@@ -120,6 +126,119 @@ def get_cost_over_time():
         'success': True,
         'data': data,
         'timeframe': timeframe
+    })
+
+
+@app.route('/api/sessions')
+def get_sessions():
+    """Get all refactoring sessions."""
+    state_manager = get_refactor_state()
+    sessions = state_manager.list_sessions()
+
+    return jsonify({
+        'success': True,
+        'sessions': sessions,
+        'total': len(sessions)
+    })
+
+
+@app.route('/api/session/<session_id>')
+def get_session_detail(session_id):
+    """Get detailed information for a specific session."""
+    state_manager = get_refactor_state()
+    session_info = state_manager.get_resume_info(session_id)
+
+    if not session_info:
+        return jsonify({
+            'success': False,
+            'error': 'Session not found'
+        }), 404
+
+    return jsonify({
+        'success': True,
+        'session': session_info
+    })
+
+
+@app.route('/api/enhanced-statistics')
+def get_enhanced_statistics():
+    """Get enhanced statistics including blocked files and sessions.
+
+    Query params:
+        timeframe: day, week, month, all (default: all)
+    """
+    audit_logger = get_audit_logger()
+    state_manager = get_refactor_state()
+
+    timeframe = request.args.get('timeframe', 'all')
+
+    # Get basic statistics
+    stats = audit_logger.get_statistics_by_timeframe(timeframe)
+
+    # Get blocked files count
+    blocked_logs = audit_logger.get_logs_by_status('blocked', limit=10000)
+    stats['blocked_files'] = len(blocked_logs)
+
+    # Get session statistics
+    sessions = state_manager.list_sessions()
+    active_sessions = [s for s in sessions if s.get('can_resume', False)]
+    completed_sessions = [s for s in sessions if s.get('percentage', 0) >= 100]
+
+    stats['sessions'] = {
+        'total': len(sessions),
+        'active': len(active_sessions),
+        'completed': len(completed_sessions)
+    }
+
+    # Calculate average session progress
+    if sessions:
+        avg_progress = sum(s.get('percentage', 0) for s in sessions) / len(sessions)
+        stats['sessions']['avg_progress'] = round(avg_progress, 1)
+    else:
+        stats['sessions']['avg_progress'] = 0
+
+    return jsonify({
+        'success': True,
+        'statistics': stats
+    })
+
+
+@app.route('/api/recent-activity')
+def get_recent_activity():
+    """Get recent activity summary."""
+    audit_logger = get_audit_logger()
+
+    # Get recent logs
+    recent_logs = audit_logger.get_recent_logs(limit=10)
+
+    # Group by status
+    activity = {
+        'recent_refactors': [],
+        'recent_blocks': [],
+        'recent_errors': []
+    }
+
+    for log in recent_logs:
+        item = {
+            'id': log['id'],
+            'timestamp': log['timestamp'],
+            'filepath': log['filepath'],
+            'action': log['action'],
+            'status': log['status'],
+            'cost': log.get('cost', 0),
+            'tokens': log.get('tokens_used', 0)
+        }
+
+        if log['status'] == 'success':
+            activity['recent_refactors'].append(item)
+        elif log['status'] == 'blocked':
+            activity['recent_blocks'].append(item)
+        elif log['status'] in ['error', 'failed']:
+            activity['recent_errors'].append(item)
+
+    return jsonify({
+        'success': True,
+        'activity': activity
     })
 
 
