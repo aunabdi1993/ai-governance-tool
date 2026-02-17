@@ -120,17 +120,24 @@ Install globally using `pipx` for system-wide access:
 pip install pipx
 pipx ensurepath
 
-# Install ai-governance globally
-pipx install /path/to/ai-governance-tool
+# Install ai-governance-tool from PyPI
+pipx install ai-governance-tool
 ```
 
 Now `ai-governance` is available from any directory, any project!
 
-### Alternative: Local Development Install
+> **Note:** The PyPI package is `ai-governance-tool` but the CLI command is `ai-governance`.
 
-For development or project-specific installation:
+### Alternative: pip install
 
 ```bash
+pip install ai-governance-tool
+```
+
+### Development Install (from source)
+
+```bash
+git clone https://github.com/aunabdi93/ai-governance-tool
 cd ai-governance-tool
 pip install -e .
 ```
@@ -688,6 +695,13 @@ For issues or questions:
 **Tool not found after installation:**
 - With pipx: Make sure `~/.local/bin` is in your PATH
 - Run `pipx ensurepath` and restart your terminal
+
+**Upgrade to the latest version:**
+```bash
+pipx upgrade ai-governance-tool
+# or
+pip install --upgrade ai-governance-tool
+```
 
 **Want to change API key:**
 - Just enter a different key when prompted
