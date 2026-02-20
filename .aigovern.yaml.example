@@ -1,0 +1,247 @@
+# AI Governance Tool Configuration Example
+# Copy this file to .aigovern.yaml in your project root or ~/.config/ai-governance/policy.yaml
+
+# General Settings
+name: "Example Governance Policy"
+version: "1.0"
+description: "Example security and governance policy for AI-assisted refactoring"
+
+# AI Provider Configuration
+provider:
+  # Provider to use: "claude", "openai", or other registered providers
+  name: "claude"
+
+  # Model-specific settings
+  model: "claude-sonnet-4-5-20250929"  # or "gpt-4", "gpt-3.5-turbo" for OpenAI
+
+  # API configuration (keys should be in environment variables)
+  api_key_env: "ANTHROPIC_API_KEY"  # or "OPENAI_API_KEY"
+
+  # Request parameters
+  temperature: 0.0  # 0.0 for deterministic, higher for creative
+  max_tokens: 8000
+  timeout: 60  # seconds
+
+# Cost Controls
+cost_limits:
+  # Maximum cost per operation (USD)
+  max_cost_per_operation: 1.00
+
+  # Maximum tokens per request
+  max_tokens_per_request: 100000
+
+  # Warn if estimated cost exceeds threshold
+  warn_threshold: 0.50
+
+  # Require confirmation for operations above this cost
+  confirmation_threshold: 0.75
+
+# Security Policies
+security:
+  # Block files matching these patterns (glob format)
+  blocked_paths:
+    - "**/.env"
+    - "**/.env.*"
+    - "**/secrets.yaml"
+    - "**/credentials.json"
+    - "**/*_secret*"
+    - "**/*_password*"
+    - "**/id_rsa"
+    - "**/id_dsa"
+    - "**/.ssh/*"
+    - "**/node_modules/**"
+    - "**/venv/**"
+    - "**/.git/**"
+
+  # Scan for these patterns in code before processing
+  # Each pattern has: pattern (regex), severity (low/medium/high/critical), message
+  security_patterns:
+    - name: "hardcoded_api_key"
+      pattern: '(?i)(api[_-]?key|apikey)\s*=\s*["\'][a-zA-Z0-9_\-]{20,}["\']'
+      severity: "critical"
+      message: "Hardcoded API key detected"
+
+    - name: "hardcoded_password"
+      pattern: '(?i)(password|passwd|pwd)\s*=\s*["\'][^"\']{3,}["\']'
+      severity: "critical"
+      message: "Hardcoded password detected"
+
+    - name: "aws_access_key"
+      pattern: 'AKIA[0-9A-Z]{16}'
+      severity: "critical"
+      message: "AWS Access Key ID detected"
+
+    - name: "sql_injection"
+      pattern: '(execute|exec|query)\s*\(\s*["\'].*%s.*["\']'
+      severity: "high"
+      message: "Potential SQL injection vulnerability"
+
+    - name: "command_injection"
+      pattern: '(os\.system|subprocess\.call|exec)\s*\([^)]*\+[^)]*\)'
+      severity: "high"
+      message: "Potential command injection vulnerability"
+
+    - name: "eval_usage"
+      pattern: '\beval\s*\('
+      severity: "medium"
+      message: "Use of eval() detected - security risk"
+
+    - name: "pickle_unsafe"
+      pattern: 'pickle\.loads?\s*\('
+      severity: "medium"
+      message: "Unsafe pickle usage - code execution risk"
+
+    - name: "shell_true"
+      pattern: 'shell\s*=\s*True'
+      severity: "medium"
+      message: "subprocess with shell=True is dangerous"
+
+    - name: "weak_crypto"
+      pattern: '(MD5|SHA1|DES)\s*\('
+      severity: "low"
+      message: "Weak cryptographic algorithm detected"
+
+  # Allow certain violations with explicit approval
+  allow_overrides: true
+
+  # Maximum number of security findings before blocking
+  max_findings_threshold: 5
+
+  # Severity levels that require approval
+  require_approval_for:
+    - "critical"
+    - "high"
+
+# Audit and Compliance
+audit:
+  # Enable audit logging
+  enabled: true
+
+  # Audit database location
+  database_path: ".ai-governance/audit.db"
+
+  # Log retention (days, 0 = forever)
+  retention_days: 90
+
+  # Fields to include in audit log
+  log_fields:
+    - "timestamp"
+    - "operation"
+    - "file_path"
+    - "model_used"
+    - "prompt"
+    - "status"
+    - "violations"
+    - "tokens_used"
+    - "cost"
+    - "user"
+
+  # Export format for audit reports
+  export_formats:
+    - "json"
+    - "csv"
+
+# Refactoring Policies
+refactoring:
+  # Require tests to pass before applying changes
+  require_tests: false
+
+  # Create backups before modifying files
+  create_backups: true
+  backup_dir: ".ai-governance/backups"
+
+  # Maximum files to process in batch mode
+  max_batch_size: 50
+
+  # Languages to support (empty = all)
+  allowed_languages: []
+
+  # Show diffs before applying changes
+  show_diff: true
+
+  # Require confirmation before applying changes
+  require_confirmation: true
+
+# Dependency Analysis
+dependencies:
+  # Analyze dependencies before refactoring
+  enabled: true
+
+  # Maximum depth for dependency analysis
+  max_depth: 3
+
+  # Include test files in analysis
+  include_tests: false
+
+# Advanced Features
+advanced:
+  # Use call graph analysis for multi-file refactoring
+  call_graph_analysis: true
+
+  # Impact analysis before refactoring
+  impact_analysis: true
+
+  # Checkpoint interval for large operations (number of files)
+  checkpoint_interval: 10
+
+  # Retry failed operations
+  retry_on_failure: true
+  max_retries: 3
+
+  # Parallel processing
+  parallel_processing: false
+  max_workers: 4
+
+# User Preferences
+preferences:
+  # Verbosity level: 0 (quiet), 1 (normal), 2 (verbose), 3 (debug)
+  verbosity: 1
+
+  # Color output in terminal
+  color_output: true
+
+  # Show progress bars
+  show_progress: true
+
+  # Auto-approve low-severity findings
+  auto_approve_low_severity: false
+
+# Custom Validators (optional)
+# Define custom validation rules for your codebase
+validators:
+  # Example: Enforce naming conventions
+  - name: "class_naming"
+    pattern: '^class\s+[A-Z][a-zA-Z0-9]*'
+    message: "Classes must use PascalCase"
+    severity: "low"
+
+  # Example: Require docstrings
+  - name: "function_docstring"
+    pattern: '^def\s+\w+\([^)]*\):\s*"""'
+    message: "Functions should have docstrings"
+    severity: "low"
+
+# Notifications (future feature)
+notifications:
+  enabled: false
+  channels:
+    - type: "email"
+      recipient: "team@example.com"
+      on_events: ["critical_violation", "refactoring_complete"]
+
+    - type: "slack"
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      on_events: ["critical_violation"]
+
+# Integration with CI/CD (future feature)
+ci_cd:
+  enabled: false
+
+  # Block CI/CD pipeline on violations
+  block_on_violation: true
+
+  # Required checks before deployment
+  required_checks:
+    - "security_scan"
+    - "policy_compliance"
+    - "test_coverage"
