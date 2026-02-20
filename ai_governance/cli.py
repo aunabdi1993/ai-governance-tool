@@ -8,13 +8,14 @@ from dotenv import load_dotenv
 
 from .policy_engine import PolicyEngine
 from .scanner import Scanner
-from .ai_client import AIClient
 from .diff_manager import DiffManager
 from .audit_logger import AuditLogger
 from .file_discoverer import FileDiscoverer
 from .batch_processor import BatchProcessor
 from .codebase_refactor import CodebaseRefactor
 from .config_manager import ConfigManager
+from .providers import ProviderFactory
+from .core.exceptions import ProviderError, ProviderAuthError
 from .language_config import (
     get_extensions_for_languages,
     parse_extensions,
@@ -154,35 +155,35 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
     scan_result = scanner.scan_file(filepath)
 
     # Display scan results
-    if scan_result.get('error'):
-        click.echo(f"\n{Fore.RED}❌ ERROR: {scan_result['reason']}{Style.RESET_ALL}")
+    if scan_result.error:
+        click.echo(f"\n{Fore.RED}❌ ERROR: {scan_result.reason}{Style.RESET_ALL}")
         audit_logger.log_action(
             filepath=filepath,
             action='refactor',
             status='error',
-            reason=scan_result['reason']
+            reason=scan_result.reason
         )
         return
 
-    if not scan_result['allowed']:
-        click.echo(f"\n{Fore.RED}🚫 BLOCKED: {scan_result['reason']}{Style.RESET_ALL}")
-        click.echo(f"File size: {scan_result['file_size']} bytes\n")
+    if not scan_result.allowed:
+        click.echo(f"\n{Fore.RED}🚫 BLOCKED: {scan_result.reason}{Style.RESET_ALL}")
+        click.echo(f"File size: {scan_result.file_size} bytes\n")
 
-        if scan_result['findings']:
+        if scan_result.findings:
             click.echo(f"{Fore.YELLOW}Sensitive patterns detected:{Style.RESET_ALL}")
-            for finding in scan_result['findings']:
-                click.echo(f"  • {Fore.RED}{finding['pattern']}{Style.RESET_ALL} "
-                          f"({finding['severity']}): {finding['description']}")
-                click.echo(f"    Matches: {finding['match_count']}, "
-                          f"Examples: {', '.join(finding['examples'])}")
+            for finding in scan_result.findings:
+                click.echo(f"  • {Fore.RED}{finding.pattern}{Style.RESET_ALL} "
+                          f"({finding.severity.value}): {finding.description}")
+                click.echo(f"    Matches: {finding.match_count}, "
+                          f"Examples: {', '.join(finding.examples)}")
 
         # Log blocked attempt
         audit_logger.log_action(
             filepath=filepath,
             action='refactor',
             status='blocked',
-            reason=scan_result['reason'],
-            findings=scan_result['findings'],
+            reason=scan_result.reason,
+            findings=scan_result.findings,
             target_description=target
         )
 
@@ -190,8 +191,8 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
         return
 
     # File passed security checks
-    click.echo(f"\n{Fore.GREEN}✅ PASSED: {scan_result['reason']}{Style.RESET_ALL}")
-    click.echo(f"File size: {scan_result['file_size']} bytes")
+    click.echo(f"\n{Fore.GREEN}✅ PASSED: {scan_result.reason}{Style.RESET_ALL}")
+    click.echo(f"File size: {scan_result.file_size} bytes")
 
     if dry_run:
         click.echo(f"\n{Fore.YELLOW}Dry run mode - stopping before refactoring{Style.RESET_ALL}")
@@ -199,7 +200,7 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
             filepath=filepath,
             action='scan',
             status='allowed',
-            reason=scan_result['reason']
+            reason=scan_result.reason
         )
         return
 
@@ -213,49 +214,55 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
     click.echo(f"Target: {target}")
 
     try:
-        ai_client = AIClient()
-        click.echo(f"Model: {ai_client.model}\n")
+        # Create provider using factory
+        factory = ProviderFactory()
+        provider = factory.create("claude")  # Default to Claude, can be made configurable
+
+        model_info = provider.get_model_info()
+        click.echo(f"Model: {model_info['model']}\n")
 
         # Estimate cost first
-        estimate = ai_client.estimate_cost(scan_result['content'], target)
-        click.echo(f"{Fore.YELLOW}Estimated cost: ${estimate['estimated_cost']:.4f}{Style.RESET_ALL}")
-        click.echo(f"Estimated tokens: ~{estimate['estimated_total_tokens']}\n")
+        estimate = provider.estimate_cost(scan_result.content or "", target)
+        click.echo(f"{Fore.YELLOW}Estimated cost: ${estimate.estimated_cost:.4f}{Style.RESET_ALL}")
+        click.echo(f"Estimated tokens: ~{estimate.estimated_total_tokens}\n")
 
         # Call AI
-        result = ai_client.refactor_code(
-            code=scan_result['content'],
+        result = provider.refactor_code(
+            code=scan_result.content or "",
             target_description=target,
             filepath=filepath
         )
 
-        if not result['success']:
-            click.echo(f"{Fore.RED}Error during refactoring: {result['error']}{Style.RESET_ALL}")
+        if not result.success:
+            click.echo(f"{Fore.RED}Error during refactoring: {result.error}{Style.RESET_ALL}")
             audit_logger.log_action(
                 filepath=filepath,
                 action='refactor',
                 status='error',
-                reason=result['error'],
+                reason=result.error or "Unknown error",
                 target_description=target,
-                model=result['model']
+                model=result.model
             )
             return
 
         # Display results
         click.echo(f"{Fore.GREEN}✅ Refactoring completed!{Style.RESET_ALL}\n")
-        click.echo(f"{Fore.YELLOW}Tokens used: {result['tokens_used']['total']}{Style.RESET_ALL}")
-        click.echo(f"  Input:  {result['tokens_used']['input']}")
-        click.echo(f"  Output: {result['tokens_used']['output']}")
-        click.echo(f"{Fore.YELLOW}Actual cost: ${result['cost']:.6f}{Style.RESET_ALL}\n")
+        tokens = result.tokens_used
+        if tokens:
+            click.echo(f"{Fore.YELLOW}Tokens used: {tokens.total}{Style.RESET_ALL}")
+            click.echo(f"  Input:  {tokens.input}")
+            click.echo(f"  Output: {tokens.output}")
+        click.echo(f"{Fore.YELLOW}Actual cost: ${result.cost:.6f}{Style.RESET_ALL}\n")
 
         # Show diff
         diff_manager.display_diff(
-            original=scan_result['content'],
-            refactored=result['refactored_code'],
+            original=scan_result.content or "",
+            refactored=result.refactored_code or "",
             filepath=filepath
         )
 
         # Show stats
-        stats = diff_manager.get_stats(scan_result['content'], result['refactored_code'])
+        stats = diff_manager.get_stats(scan_result.content or "", result.refactored_code or "")
         diff_manager.display_stats(stats)
 
         # Log success
@@ -264,12 +271,12 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
             action='refactor',
             status='success',
             reason='Refactoring completed successfully',
-            tokens_used=result['tokens_used']['total'],
-            cost=result['cost'],
-            model=result['model'],
+            tokens_used=tokens.total if tokens else 0,
+            cost=result.cost,
+            model=result.model,
             target_description=target,
-            original_code=scan_result['content'],
-            refactored_code=result['refactored_code']
+            original_code=scan_result.content,
+            refactored_code=result.refactored_code
         )
 
         # Ask to apply changes (unless --apply flag is set)
@@ -281,16 +288,18 @@ def refactor(filepath, target, policy, no_backup, dry_run, apply):
                     click.echo(f"{Fore.GREEN}Backup created: {backup_path}{Style.RESET_ALL}")
 
             # Save refactored code
-            if diff_manager.save_refactored(filepath, result['refactored_code']):
+            if diff_manager.save_refactored(filepath, result.refactored_code or ""):
                 click.echo(f"{Fore.GREEN}✅ Changes applied to {filepath}{Style.RESET_ALL}")
             else:
                 click.echo(f"{Fore.RED}❌ Failed to save changes{Style.RESET_ALL}")
         else:
             click.echo(f"{Fore.YELLOW}Changes not applied{Style.RESET_ALL}")
 
-    except ValueError as e:
-        click.echo(f"\n{Fore.RED}Configuration error: {e}{Style.RESET_ALL}")
+    except ProviderAuthError as e:
+        click.echo(f"\n{Fore.RED}Authentication error: {e}{Style.RESET_ALL}")
         click.echo(f"{Fore.YELLOW}Set ANTHROPIC_API_KEY environment variable{Style.RESET_ALL}")
+    except ProviderError as e:
+        click.echo(f"\n{Fore.RED}Provider error: {e}{Style.RESET_ALL}")
     except Exception as e:
         click.echo(f"\n{Fore.RED}Error: {e}{Style.RESET_ALL}")
 
@@ -485,14 +494,16 @@ def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, p
         click.echo(f"\n{Fore.RED}Cannot proceed without API key{Style.RESET_ALL}")
         return
 
-    # Initialize AI client if not dry run
-    ai_client = None
+    # Initialize AI provider if not dry run
+    provider = None
     if not dry_run:
         try:
-            ai_client = AIClient()
-            click.echo(f"\n{Fore.CYAN}Model: {ai_client.model}{Style.RESET_ALL}")
+            factory = ProviderFactory()
+            provider = factory.create("claude")  # Default to Claude, can be made configurable
+            model_info = provider.get_model_info()
+            click.echo(f"\n{Fore.CYAN}Model: {model_info['model']}{Style.RESET_ALL}")
         except Exception as e:
-            click.echo(f"{Fore.RED}Error initializing AI client: {e}{Style.RESET_ALL}")
+            click.echo(f"{Fore.RED}Error initializing AI provider: {e}{Style.RESET_ALL}")
             return
 
     # Process files
@@ -500,7 +511,7 @@ def bulk_refactor(paths, target, policy, no_backup, dry_run, apply, recursive, p
     batch_processor = BatchProcessor(
         policy_engine=policy_engine,
         scanner=scanner,
-        ai_client=ai_client,
+        ai_client=provider,  # Will be renamed to ai_provider in BatchProcessor
         diff_manager=diff_manager,
         audit_logger=audit_logger,
         no_backup=no_backup,

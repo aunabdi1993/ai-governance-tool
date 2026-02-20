@@ -11,7 +11,7 @@ import click
 from colorama import Fore, Style
 
 from .dependency_analyzer import DependencyAnalyzer
-from .ai_client import AIClient
+from .providers import ProviderFactory
 from .scanner import Scanner
 from .validators import CrossFileValidator, ValidationResult, TypeChecker
 from .diff_manager import DiffManager
@@ -56,7 +56,8 @@ class CodebaseRefactor:
             enable_resume: Enable checkpoint/resume functionality
             show_plan: Display refactoring plan before execution
         """
-        self.ai_client = AIClient(api_key)
+        factory = ProviderFactory()
+        self.ai_client = factory.create("claude", api_key=api_key)
         self.scanner = Scanner(policy_path)
         self.dependency_analyzer = DependencyAnalyzer()
         self.call_graph_analyzer = CallGraphAnalyzer()
@@ -391,7 +392,7 @@ class CodebaseRefactor:
         for file_path in file_paths:
             scan_result = self.scanner.scan_file(file_path)
 
-            if scan_result['allowed']:
+            if scan_result.allowed:
                 results['allowed'].append(file_path)
             else:
                 results['blocked'].append(file_path)
@@ -464,7 +465,7 @@ class CodebaseRefactor:
 
                 # Refactor with context
                 code = file_contents[file_path]
-                result = self.ai_client.refactor_with_context(
+                refactor_result = self.ai_client.refactor_with_context(
                     code=code,
                     target_description=target,
                     filepath=file_path,
@@ -472,6 +473,8 @@ class CodebaseRefactor:
                     dependency_info=dep_graph
                 )
 
+                # Convert to dict for backward compatibility
+                result = refactor_result.to_dict()
                 # Store original code for impact analysis
                 result['original_code'] = code
 

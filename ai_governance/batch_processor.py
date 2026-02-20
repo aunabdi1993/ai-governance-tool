@@ -142,37 +142,37 @@ class BatchProcessor:
         scan_result = self.scanner.scan_file(filepath)
 
         # Handle errors
-        if scan_result.get('error'):
-            click.echo(f"{Fore.RED}❌ ERROR: {scan_result['reason']}{Style.RESET_ALL}")
+        if scan_result.error:
+            click.echo(f"{Fore.RED}❌ ERROR: {scan_result.reason}{Style.RESET_ALL}")
             self.audit_logger.log_action(
                 filepath=filepath,
                 action='refactor',
                 status='error',
-                reason=scan_result['reason']
+                reason=scan_result.reason
             )
             return {
                 'status': 'failed',
-                'reason': scan_result['reason']
+                'reason': scan_result.reason
             }
 
         # Handle blocked files
-        if not scan_result['allowed']:
-            click.echo(f"{Fore.YELLOW}🚫 BLOCKED: {scan_result['reason']}{Style.RESET_ALL}")
+        if not scan_result.allowed:
+            click.echo(f"{Fore.YELLOW}🚫 BLOCKED: {scan_result.reason}{Style.RESET_ALL}")
 
             # Log blocked attempt
             self.audit_logger.log_action(
                 filepath=filepath,
                 action='refactor',
                 status='blocked',
-                reason=scan_result['reason'],
-                findings=scan_result['findings'],
+                reason=scan_result.reason,
+                findings=scan_result.findings,
                 target_description=target
             )
 
             return {
                 'status': 'blocked',
-                'reason': scan_result['reason'],
-                'findings': scan_result.get('findings', [])
+                'reason': scan_result.reason,
+                'findings': scan_result.findings
             }
 
         # File passed security checks
@@ -184,7 +184,7 @@ class BatchProcessor:
                 filepath=filepath,
                 action='scan',
                 status='allowed',
-                reason=scan_result['reason']
+                reason=scan_result.reason
             )
             return {
                 'status': 'skipped',
@@ -194,29 +194,31 @@ class BatchProcessor:
         # Refactor with AI
         try:
             result = self.ai_client.refactor_code(
-                code=scan_result['content'],
+                code=scan_result.content or "",
                 target_description=target,
                 filepath=filepath
             )
 
-            if not result['success']:
-                click.echo(f"{Fore.RED}❌ Refactoring failed: {result['error']}{Style.RESET_ALL}")
+            if not result.success:
+                click.echo(f"{Fore.RED}❌ Refactoring failed: {result.error}{Style.RESET_ALL}")
                 self.audit_logger.log_action(
                     filepath=filepath,
                     action='refactor',
                     status='error',
-                    reason=result['error'],
+                    reason=result.error or "Unknown error",
                     target_description=target,
-                    model=result['model']
+                    model=result.model
                 )
                 return {
                     'status': 'failed',
-                    'reason': result['error']
+                    'reason': result.error or "Unknown error"
                 }
 
             # Success!
-            click.echo(f"{Fore.GREEN}✅ Refactored - Cost: ${result['cost']:.6f}, "
-                      f"Tokens: {result['tokens_used']['total']}{Style.RESET_ALL}")
+            tokens = result.tokens_used
+            tokens_total = tokens.total if tokens else 0
+            click.echo(f"{Fore.GREEN}✅ Refactored - Cost: ${result.cost:.6f}, "
+                      f"Tokens: {tokens_total}{Style.RESET_ALL}")
 
             # Log success
             self.audit_logger.log_action(
@@ -224,12 +226,12 @@ class BatchProcessor:
                 action='refactor',
                 status='success',
                 reason='Refactoring completed successfully',
-                tokens_used=result['tokens_used']['total'],
-                cost=result['cost'],
-                model=result['model'],
+                tokens_used=tokens_total,
+                cost=result.cost,
+                model=result.model,
                 target_description=target,
-                original_code=scan_result['content'],
-                refactored_code=result['refactored_code']
+                original_code=scan_result.content,
+                refactored_code=result.refactored_code
             )
 
             # Apply changes if in batch mode (we auto-apply in batch)
@@ -241,7 +243,7 @@ class BatchProcessor:
                         click.echo(f"{Fore.BLUE}Backup: {backup_path}{Style.RESET_ALL}")
 
                 # Save refactored code
-                if self.diff_manager.save_refactored(filepath, result['refactored_code']):
+                if self.diff_manager.save_refactored(filepath, result.refactored_code or ""):
                     click.echo(f"{Fore.GREEN}Applied changes to {filepath}{Style.RESET_ALL}")
                 else:
                     click.echo(f"{Fore.RED}Failed to save changes{Style.RESET_ALL}")
@@ -252,9 +254,9 @@ class BatchProcessor:
 
             return {
                 'status': 'success',
-                'cost': result['cost'],
-                'tokens_used': result['tokens_used']['total'],
-                'model': result['model']
+                'cost': result.cost,
+                'tokens_used': tokens_total,
+                'model': result.model
             }
 
         except Exception as e:

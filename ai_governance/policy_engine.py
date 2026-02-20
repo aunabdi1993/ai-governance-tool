@@ -11,9 +11,15 @@ except ImportError:
     # Python < 3.9
     from importlib_resources import files
 
+from .core.base import GovernanceEngine
+from .core.types import Finding, PolicyInfo, SeverityLevel
 
-class PolicyEngine:
-    """Manages security policies for AI governance."""
+
+class PolicyEngine(GovernanceEngine):
+    """Manages security policies for AI governance.
+
+    Implements the GovernanceEngine abstract base class with YAML-based policies.
+    """
 
     def __init__(self, policy_path: Optional[str] = None):
         """Initialize policy engine with a policy file.
@@ -75,16 +81,16 @@ class PolicyEngine:
 
         return False, None
 
-    def scan_content(self, content: str) -> List[Dict]:
+    def scan_content(self, content: str) -> List[Finding]:
         """Scan content for sensitive patterns.
 
         Args:
             content: Text content to scan
 
         Returns:
-            List of findings with pattern name, description, severity, and matches
+            List of Finding objects describing detected patterns
         """
-        findings = []
+        findings: List[Finding] = []
 
         for pattern_name, pattern_data in self.compiled_patterns.items():
             matches = pattern_data['regex'].findall(content)
@@ -96,13 +102,14 @@ class PolicyEngine:
                     for match in matches[:3]  # Show max 3 examples
                 ]
 
-                findings.append({
-                    'pattern': pattern_name,
-                    'description': pattern_data['description'],
-                    'severity': pattern_data['severity'],
-                    'match_count': len(matches),
-                    'examples': redacted_matches
-                })
+                finding = Finding(
+                    pattern=pattern_name,
+                    description=pattern_data['description'],
+                    severity=SeverityLevel(pattern_data['severity']),
+                    match_count=len(matches),
+                    examples=redacted_matches
+                )
+                findings.append(finding)
 
         return findings
 
@@ -114,12 +121,16 @@ class PolicyEngine:
         """Check if logging is enabled."""
         return self.policy.get('logging', {}).get('enabled', True)
 
-    def get_policy_info(self) -> Dict:
-        """Get policy metadata."""
-        return {
-            'name': self.policy.get('name', 'unknown'),
-            'version': self.policy.get('version', 'unknown'),
-            'description': self.policy.get('description', ''),
-            'blocked_patterns_count': len(self.policy.get('blocked_file_patterns', [])),
-            'sensitive_patterns_count': len(self.policy.get('sensitive_patterns', {}))
-        }
+    def get_policy_info(self) -> PolicyInfo:
+        """Get policy metadata.
+
+        Returns:
+            PolicyInfo with name, version, and pattern counts
+        """
+        return PolicyInfo(
+            name=self.policy.get('name', 'unknown'),
+            version=self.policy.get('version', 'unknown'),
+            description=self.policy.get('description', ''),
+            blocked_patterns_count=len(self.policy.get('blocked_file_patterns', [])),
+            sensitive_patterns_count=len(self.policy.get('sensitive_patterns', {}))
+        )
